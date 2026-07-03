@@ -14,11 +14,15 @@ from scattering_ai.core.schemas import (
 
 __version__ = "0.1.0.dev0"
 
+from scattering_ai.core.agent import Agent, analyze  # noqa: E402  (needs __version__)
+
 __all__ = [
+    "Agent",
     "AnalysisReport",
     "AnalysisRequest",
     "Citation",
     "Confidence",
     "Provenance",
+    "analyze",
     "__version__",
 ]

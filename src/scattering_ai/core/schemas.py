@@ -92,3 +92,9 @@ class AnalysisReport(BaseModel):
     used_tools: list[str] = Field(default_factory=list)
     confidence: Confidence = Confidence.LOW
     provenance: Provenance = Field(default_factory=Provenance)
+
+    @property
+    def markdown(self) -> str:
+        from scattering_ai.reports.markdown import render
+
+        return render(self)
