@@ -218,7 +218,9 @@ def fit_peaks(
         "flags": {
             "at_bounds": at_bounds,
             "high_uncertainty": high_uncertainty,
-            "poor_fit": reduced_chi2 > 10,
+            # High-count data legitimately gives chi2 >> 1 from tiny model-shape
+            # imperfections, so "poor" requires meaningful misfit (rwp) too.
+            "poor_fit": rwp > 0.10 and reduced_chi2 > 10,
         },
     }
 

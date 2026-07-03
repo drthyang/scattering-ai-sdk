@@ -159,6 +159,43 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
         peaks = c.find_peaks(cut, subtract_background=False)
         return {"saved": str(out_path), "summary": cut.summary(), "peaks": peaks[:10]}
 
+    def inspect_series(paths: list[str], mask_value: float | None = None) -> dict:
+        from scattering_ai.tools.series import load_series
+
+        series = load_series(paths, mask_value=mask_value)
+        out = series.summary()
+        peaks = c.find_peaks(series.curves[0], subtract_background=True)
+        out["peaks_in_first_curve"] = peaks[:10]
+        return out
+
+    def track_peak_series(paths: list[str], center: float,
+                          fwhm_guess: float | None = None,
+                          mask_value: float | None = None) -> dict:
+        from scattering_ai.tools.series import detect_transition, load_series, track_peak
+
+        series = load_series(paths, mask_value=mask_value)
+        tracked = track_peak(series, center=center, fwhm_guess=fwhm_guess)
+        good = [r for r in tracked["rows"] if r.get("ok")]
+        result: dict = {
+            "n_points": tracked["n_points"],
+            "n_good_fits": tracked["n_good_fits"],
+            "rows": [
+                {k: r.get(k) for k in
+                 ("param", "center", "center_err", "fwhm", "fwhm_err", "height", "ok")}
+                for r in tracked["rows"]
+            ],
+        }
+        if len(good) >= 6:
+            result["transition_on_center"] = detect_transition(
+                [r["param"] for r in good], [r["center"] for r in good],
+                [r["center_err"] for r in good],
+            )
+            result["transition_on_fwhm"] = detect_transition(
+                [r["param"] for r in good], [r["fwhm"] for r in good],
+                [r["fwhm_err"] for r in good],
+            )
+        return result
+
     number = {"type": "number"}
     opt_number = {"type": ["number", "null"]}
     string = {"type": "string"}
@@ -252,6 +289,30 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
                     ["slice_path", "x0", "y0", "x1", "y1"],
                 ),
                 line_cut_2d,
+            ),
+            AgentTool(
+                "inspect_series",
+                "Load a parametric series of 1D files (temperature/field scan; the "
+                "parameter is parsed from filenames like 'T_base_5.0K'). Returns the "
+                "parameter values and the peaks found in the first curve. "
+                "mask_value: sentinel for masked points (e.g. -3.0).",
+                _params(
+                    {"paths": {"type": "array", "items": string}, "mask_value": opt_number},
+                    ["paths"],
+                ),
+                inspect_series,
+            ),
+            AgentTool(
+                "track_peak_series",
+                "Fit one peak in every curve of a parametric series and track its "
+                "center/FWHM/height vs the parameter, then run changepoint detection "
+                "on center and FWHM trends. Use for transition hunting.",
+                _params(
+                    {"paths": {"type": "array", "items": string}, "center": number,
+                     "fwhm_guess": opt_number, "mask_value": opt_number},
+                    ["paths", "center"],
+                ),
+                track_peak_series,
             ),
         ]
     )
