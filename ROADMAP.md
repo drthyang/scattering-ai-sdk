@@ -36,6 +36,8 @@ Decisions are recorded here so future contributors see *why*, and so any of them
 | D5 | Python ≥ 3.10 | Modern typing (`X \| Y`, `ParamSpec`) without excluding HPC/facility environments | Accepted (2026-07) |
 | D6 | Local-first by design | Scattering data is often unpublished or facility-restricted; the SDK must be fully functional with local models and must never require sending data to a cloud service | Accepted (2026-07) |
 | D7 | Vertical slice before framework | Build one useful end-to-end path (RMC run health) before generalizing | Accepted (2026-07) |
+| D8 | Tools-first reprioritization | Experience with the interpretation-only RMC prototype showed limited value in commentary without action. Deterministic data-operation tools (1D fit/rebin/transform, 2D feature extraction, 3D slicing) become the center of Track B; the agent's power comes from orchestrating tools, with RAG in a supporting role. Tools are organized by data dimensionality; temperature/field dependence is a series axis over 1D/2D data, not a separate toolkit | Accepted (2026-07) |
+| D9 | numpy/scipy in core; h5py optional | Data tools are now the SDK's center, so numeric deps are core; HDF5/NeXus volume support stays an extra (`[volumes]`) for lightweight installs | Accepted (2026-07) |
 
 ---
 
@@ -303,12 +305,42 @@ Track D — Trust & Quality     D1 diagnostics → D2 reports → D3 evaluation 
 - **Non-goals:** large document ingestion, PDF-of-papers parsing, web retrieval.
 - **Risk:** knowledge sprawl — keep it small and curated; every file needs an owner-reviewed pass.
 
-#### B3 — Tools & Skills System
+#### B3 — Data Operations Toolkit (the center of the SDK, per D8)
 
-- **Goal:** Make the assistant active instead of passive.
-- **Deliverables:** tool registry with safety tiers; initial read-only tools — file tools (`list_run_files`, `read_log_tail`, `read_json`), RMC tools (`extract_r_values`, `compare_r_values`, `detect_rwp_stall`, `summarize_move_acceptance`), plot tools (list/classify/attach metadata), statistics tools (`compute_slope`, `compute_delta`, `detect_outlier`).
-- **Safety rule:** read-only by default; anything mutating or compute-heavy requires explicit user approval.
-- **Definition of Done:** for *"Why does this run look stuck?"* the agent inspects convergence trend, logs, and diagnostics via tools before answering.
+- **Goal:** Make the assistant active instead of passive. An agent is only as
+  capable as its tools: deterministic, typed, testable operations on real
+  scattering data. The LLM chooses tools and interprets results; every number
+  comes from a tool.
+- **Organizing principle:** dimensionality, with reduction downward
+  (3D → 2D slices → 1D cuts), and a **series axis** (temperature, field, time)
+  layered over 1D/2D data rather than a separate toolkit.
+- **Deliverables by dimension:**
+  - **IO:** readers for the formats in `data/` — NOMAD-style ASCII, diffpy
+    pdfgetx `.fq`/`.gr` (metadata header preserved as provenance), generic
+    columns, Mantid MDHistoWorkspace NeXus volumes; more formats as they land
+    in `data/`.
+  - **1D:** crop, rebin (error-propagating), iterative background estimation,
+    peak finding, robust peak fitting (bounded, uncertainties, fit-quality
+    flags the agent can reason about), Fourier transforms (S(Q) ↔ G(r)).
+  - **2D:** peak/blob detection, background and noise estimation, masking,
+    powder-ring detection via azimuthal integration with contaminant
+    identification against known d-spacings (Al, Cu, steel — knowledge-backed),
+    line cuts and ROI integration → 1D.
+  - **3D:** volume loader with lattice metadata; slicing at position/thickness/
+    orientation → 2D (wrap common operations; do not rebuild Mantid).
+  - **Series:** track fitted features across a parameter axis (position, width,
+    intensity vs T/H); transition detection.
+  - Tool registry with safety tiers, wired into the agent loop (A2 dispatch).
+- **Acceptance = known answers on real data:** every toolkit component must
+  reproduce a result the user already trusts on the datasets in `data/`
+  (e.g. transform NOMAD S(Q) → G(r) and match the pdfgetx `.gr` for the same
+  run; recover known peak positions; slice the CORELLI volume to a familiar
+  map).
+- **Safety rule:** read-only by default; anything mutating or compute-heavy
+  requires explicit user approval.
+- **Definition of Done:** for *"fit the peaks in this pattern"* or *"cut this
+  slice along [h,0,0] and fit the profile"*, the agent executes the tool chain
+  and reports fitted values with uncertainties — no numbers from the LLM.
 
 #### B4 — Multi-Domain Expansion
 
@@ -437,25 +469,23 @@ The same SDK powers RMC Monitor, RMC Phonon Dynamics, and Neutron Diffuse Toolki
 ## Immediate Next Actions
 
 ```text
-1.  A0: package skeleton (pyproject, src/scattering_ai, tests, README, LICENSE)   ← this session
-2.  A1: Pydantic request/report schemas with schema_version                        ← this session
-3.  A1: LLMClient protocol + OpenAI-compatible client (LM Studio/Ollama/OpenAI)    ← this session (stub)
-4.  B1: RMC monitor input schema (typed `data` for the rmc domain)
-5.  B1: three deterministic diagnostics — Rwp trend, dataset conflict, missing files
-6.  B2: seed knowledge/rmcprofile/ with 4–6 curated Markdown notes
-7.  B2: simple keyword retrieval with file+section citations
-8.  A2: minimal agent loop wiring diagnostics → retrieval → LLM → validated report
-9.  M1: first RMC run health report, CLI entry point
-10. D3: first eval cases from one known-healthy and one known-stalled run JSON
+Done (2026-07-03): A0, A1, B1, B2, minimal A2 (no tool dispatch), C1, C2, D2 —
+the RMC run health slice works end-to-end, verified against local Ollama.
+
+Next (tools-first, per D8):
+1.  B3-IO: readers for the real formats in data/ (NOMAD ASCII, pdfgetx
+    .fq/.gr, MDHisto NeXus)
+2.  B3-1D: crop/rebin/background/peak-find/peak-fit/S(Q)→G(r), validated
+    against the GaTa4Se8 S(Q)+G(r) pair and FeCoSn x-ray data
+3.  B3-3D: CORELLI volume loader + axis-aligned slab slicing → 2D
+4.  A2: tool dispatch in the agent loop (LLM chooses and chains tools)
+5.  B3-2D: peak/ring/background feature extraction on slices cut from
+    the real volume; line cuts → 1D
+6.  D3: eval cases pinning known answers from the real datasets
 ```
 
-Do not build a full agent framework first. Build one useful vertical slice:
-
-```text
-RMC Monitor JSON → diagnostics → RAG → LLM → report
-```
-
-Once that works, generalize.
+Build tools bottom-up (1D ← 2D ← 3D reduction chain); every tool must
+reproduce a known answer on real data before the agent gets to use it.
 
 ---
 
