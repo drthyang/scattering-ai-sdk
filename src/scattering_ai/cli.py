@@ -65,6 +65,43 @@ def _build_agent(args: argparse.Namespace) -> Agent:
     )
 
 
+def _run_chat(args: argparse.Namespace) -> int:
+    from scattering_ai.core.chat import ChatSession
+
+    agent = _build_agent(args)
+    if agent.llm is None:
+        sys.exit("error: chat requires an LLM backend")
+    session = ChatSession(
+        llm=agent.llm,
+        model_id=agent.model_id,
+        workspace=args.workspace or None,
+        files=args.file or None,
+        on_tool_call=lambda name, arguments, result: print(
+            f"  ⚙ {name}({', '.join(f'{k}={v}' for k, v in list(arguments.items())[:3])})"
+            + (f"  ✗ {result['error']}" if result.get("error") else "")
+        ),
+    )
+    print(f"scattering-ai chat  |  model: {agent.model_id}  |  "
+          f"workspace: {session.workspace}")
+    print("Type your question (Ctrl-D or 'exit' to quit).\n")
+    while True:
+        try:
+            user_text = input("you> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not user_text:
+            continue
+        if user_text.lower() in ("exit", "quit"):
+            break
+        try:
+            print(f"\n{session.turn(user_text)}\n")
+        except Exception as exc:
+            print(f"error: {exc}\n")
+    print(f"Transcript: {session.workspace / 'chat_transcript.md'}")
+    return 0
+
+
 def _run_plot(args: argparse.Namespace) -> str:
     from scattering_ai.tools import plotting
 
@@ -136,6 +173,18 @@ def main(argv: list[str] | None = None) -> int:
     serve_cmd.add_argument("--port", type=int, default=8551)
     serve_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
 
+    chat_cmd = sub.add_parser(
+        "chat", help="Interactive analysis session (requires an LLM backend)"
+    )
+    chat_cmd.add_argument("--file", action="append", default=[],
+                          help="Data file to work with (repeatable)")
+    chat_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
+    chat_cmd.add_argument(
+        "--backend", choices=["lmstudio", "ollama", "openai", "env"], default="ollama"
+    )
+    chat_cmd.add_argument("--model", default="", help="Model name for the backend")
+    chat_cmd.add_argument("--base-url", default="", help="Override backend base URL")
+
     plot_cmd = sub.add_parser(
         "plot",
         help="Quick-look plots: 1D files (peaks marked), .npz slices, or a series "
@@ -166,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "plot":
         print(f"Plot written to: {_run_plot(args)}")
         return 0
+    if args.command == "chat":
+        return _run_chat(args)
     request = _build_request(args)
     report = _build_agent(args).analyze(request)
 

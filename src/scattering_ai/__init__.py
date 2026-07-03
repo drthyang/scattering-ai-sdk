@@ -12,7 +12,7 @@ from scattering_ai.core.schemas import (
     Provenance,
 )
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"
 
 from scattering_ai.core.agent import Agent, analyze  # noqa: E402  (needs __version__)
 

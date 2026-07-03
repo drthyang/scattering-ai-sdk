@@ -56,6 +56,19 @@ scattering-ai analyze --file my_pattern.gr \
     --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
 ```
 
+Interactive chat — iterative analysis with tools and skills (history and
+artifacts persist across turns; transcript saved for provenance):
+
+```bash
+scattering-ai chat --backend ollama --model qwen3:32b --file data/1d/series/*.dat
+you> is there a phase transition in this series? masked points are -3.0
+```
+
+Skills — validated multi-step workflows the agent invokes as one call:
+`skill_characterize_slice` (cut → peaks → rings → plot),
+`skill_fit_pattern_peaks` (find → fit all → residual plot → table),
+`skill_scan_series_transitions` (track peaks → changepoints → verdict).
+
 Quick-look plots for judging results (peaks, fits with residuals, slices, series):
 
 ```bash

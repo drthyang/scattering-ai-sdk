@@ -40,6 +40,9 @@ class ToolRegistry:
     def __init__(self, tools: list[AgentTool]):
         self._tools = {t.name: t for t in tools}
 
+    def add(self, tool: AgentTool) -> None:
+        self._tools[tool.name] = tool
+
     @property
     def specs(self) -> list[ToolSpec]:
         return [t.spec for t in self._tools.values()]
@@ -85,8 +88,12 @@ def _params(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {"type": "object", "properties": properties, "required": required}
 
 
-def default_toolkit(workspace: str | Path) -> ToolRegistry:
-    """The standard read-only data toolkit, saving artifacts to ``workspace``."""
+def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
+    """The standard read-only data toolkit, saving artifacts to ``workspace``.
+
+    ``skills=True`` also registers the built-in composite skills
+    (``skill_*`` tools) on top of the individual tools.
+    """
     from scattering_ai.tools import curves as c
     from scattering_ai.tools import slices as sl
     from scattering_ai.tools.io import load_curve
@@ -286,7 +293,7 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
     opt_number = {"type": ["number", "null"]}
     string = {"type": "string"}
 
-    return ToolRegistry(
+    registry = ToolRegistry(
         [
             AgentTool(
                 "inspect_curve",
@@ -469,3 +476,9 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
             ),
         ]
     )
+
+    if skills:
+        from scattering_ai.skills.builtin import register_skills
+
+        register_skills(registry)
+    return registry

@@ -20,7 +20,8 @@ class SDKConfig(BaseModel):
     base_url: str = LM_STUDIO_URL
     model: str = ""
     api_key: str = "not-needed"  # local servers ignore it; cloud requires a real key
-    timeout: float = 120.0
+    # Local models with a large tool-schema prompt can take minutes per turn.
+    timeout: float = 600.0
 
     @classmethod
     def lm_studio(cls, model: str = "") -> SDKConfig:
