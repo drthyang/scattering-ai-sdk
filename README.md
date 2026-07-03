@@ -2,7 +2,7 @@
 
 **AI SDK for scattering science** — a domain-grounded reasoning layer for AI-assisted RMC, PDF/total scattering, diffraction, phonon, and diffuse-scattering workflows.
 
-> Status: **pre-alpha**. The package skeleton and schemas exist; the first vertical slice (RMC run health analysis) is under construction. See [ROADMAP.md](ROADMAP.md).
+> Status: **pre-alpha**. The first vertical slice works end-to-end: RMC run health analysis with deterministic diagnostics, cited knowledge retrieval, optional LLM interpretation, and provenance-carrying reports. See [ROADMAP.md](ROADMAP.md).
 
 ## What it is
 
@@ -25,22 +25,31 @@ pip install -e ".[llm]"        # + OpenAI-compatible LLM client (LM Studio / Oll
 
 Requires Python ≥ 3.10.
 
-## Quick look (target API)
+## Quick start
+
+Python API — works fully offline (deterministic diagnostics + cited knowledge retrieval); add an LLM client for scientific interpretation:
 
 ```python
-from scattering_ai import analyze  # coming in Milestone 1
+from scattering_ai import analyze
 
 report = analyze(domain="rmc", question="Is this run healthy?", data=rmc_monitor_json)
-print(report.markdown)
+print(report.markdown)      # or report.model_dump_json()
 ```
 
-Today the package provides the typed request/report schemas and the provider-agnostic LLM client layer:
-
 ```python
-from scattering_ai import AnalysisRequest, AnalysisReport
+from scattering_ai import Agent, AnalysisRequest
 from scattering_ai.core.config import SDKConfig
+from scattering_ai.llm.openai_compatible import OpenAICompatibleClient
 
-config = SDKConfig.lm_studio()   # or .ollama() / .openai() / .from_env()
+config = SDKConfig.lm_studio(model="your-model")   # or .ollama() / .openai() / .from_env()
+agent = Agent(llm=OpenAICompatibleClient(config), model_id=config.model)
+```
+
+CLI:
+
+```bash
+scattering-ai analyze examples/rmc_monitor_demo/stalled_run.json               # offline
+scattering-ai analyze run.json --backend lmstudio --model m --out report.md   # with local LLM
 ```
 
 ## Design principles

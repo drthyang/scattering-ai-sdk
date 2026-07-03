@@ -32,6 +32,9 @@ dev = ["pytest>=8.0", "ruff>=0.4"]
 [project.urls]
 Repository = "https://github.com/thyang/scattering-ai-sdk"
 
+[project.scripts]
+scattering-ai = "scattering_ai.cli:main"
+
 [tool.hatch.version]
 path = "src/scattering_ai/__init__.py"
 

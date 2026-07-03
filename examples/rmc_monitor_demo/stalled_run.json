@@ -1,0 +1,38 @@
+{
+  "schema_version": "1",
+  "project": "BaTiO3_local_structure",
+  "domain": "rmc",
+  "question": "Why is this run not improving?",
+  "data": {
+    "metadata": {
+      "rmc": {
+        "series": [
+          {
+            "label": "bragg_neutron",
+            "kind": "bragg",
+            "radiation": "neutron",
+            "values": [18.2, 15.1, 13.4, 12.6, 12.3, 12.2, 12.4, 12.5, 12.7, 12.8, 12.9, 13.0, 13.1, 13.1, 13.2, 13.2, 13.3, 13.3, 13.4, 13.4, 13.5, 13.5, 13.6, 13.6, 13.7, 13.7, 13.8, 13.8, 13.9, 13.9]
+          },
+          {
+            "label": "pdf_neutron",
+            "kind": "pdf",
+            "radiation": "neutron",
+            "values": [22.5, 18.3, 15.2, 13.1, 11.8, 11.0, 10.5, 10.1, 9.8, 9.6, 9.4, 9.2, 9.0, 8.9, 8.7, 8.6, 8.4, 8.3, 8.2, 8.1, 8.0, 7.9, 7.8, 7.7, 7.6, 7.5, 7.5, 7.4, 7.3, 7.3]
+          }
+        ],
+        "expected_files": ["batio3.log", "batio3.rmc6f", "batio3_partials.csv"],
+        "present_files": ["batio3.log", "batio3.rmc6f"],
+        "log_tail": [
+          "step 480000: moves accepted 3.2%",
+          "WARNING: Ti-O distance window constraint violated 1240 times",
+          "step 500000: checkpoint written"
+        ]
+      }
+    }
+  },
+  "options": {
+    "use_rag": true,
+    "use_tools": false,
+    "report_format": "markdown"
+  }
+}
