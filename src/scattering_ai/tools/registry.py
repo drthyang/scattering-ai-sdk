@@ -235,12 +235,29 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         return list(seen)
 
     def inspect_series(paths: list[str], mask_value: float | None = None) -> dict:
-        from scattering_ai.tools.series import load_series
+        from scattering_ai.tools.series import (
+            apply_mask,
+            auto_mask_value,
+            load_series,
+            stack_series,
+        )
 
-        series = load_series(_expand_paths(paths), mask_value=mask_value)
+        series = load_series(_expand_paths(paths))  # unmasked; detect first
+        detected = auto_mask_value(series.curves)
+        used = mask_value if mask_value is not None else detected
+        if used is not None:
+            apply_mask(series, float(used))
+
         out = series.summary()
-        peaks = c.find_peaks(series.curves[0], subtract_background=True)
-        out["peaks_in_first_curve"] = peaks[:10]
+        out["mask_value_detected"] = detected
+        out["mask_value_used"] = used
+        # Candidates come from the mean over the whole scan, so a peak present
+        # in only one curve (noise) is not chosen for tracking.
+        stack = stack_series(series)
+        out["strongest_peaks"] = c.find_peaks(stack, subtract_background=True)[:10]
+        out["peaks_in_first_curve"] = c.find_peaks(
+            series.curves[0], subtract_background=True
+        )[:10]
         return out
 
     def track_peak_series(paths: list[str], center: float,

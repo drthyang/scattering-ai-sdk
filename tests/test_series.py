@@ -4,9 +4,11 @@ import numpy as np
 import pytest
 
 from scattering_ai.tools.series import (
+    auto_mask_value,
     detect_transition,
     extract_param,
     load_series,
+    stack_series,
     track_peak,
 )
 
@@ -63,6 +65,46 @@ def test_track_peak_and_detect_transition(tmp_path):
         temps, [r["fwhm"] for r in good], [r["fwhm_err"] for r in good]
     )
     assert fwhm_detection["detected"]
+
+
+def test_auto_mask_detects_repeated_sentinel(tmp_path):
+    series = load_series(make_series_files(tmp_path))  # unmasked load
+    assert auto_mask_value(series.curves) == -3.0
+    # "auto" string routes through detection and masks in one call
+    masked = load_series(make_series_files(tmp_path), mask_value="auto")
+    assert masked.meta["mask_value_detected"] == -3.0
+    assert np.isnan(masked.curves[0].y[:30]).all()
+
+
+def test_auto_mask_none_on_clean_data():
+    from scattering_ai.tools.models import Curve1D
+
+    x = np.linspace(0, 10, 1200)
+    curves = [
+        Curve1D(x=x, y=1.0 + 5 * np.exp(-((x - 5) ** 2) / 0.1) + RNG.normal(0, 0.02, x.size))
+        for _ in range(6)
+    ]
+    assert auto_mask_value(curves) is None  # must not fire on unmasked data
+
+
+def test_stack_series_picks_persistent_peaks(tmp_path):
+    """A peak present in only one curve must not survive the mean stack."""
+    from scattering_ai.tools.curves import find_peaks
+
+    series = load_series(make_series_files(tmp_path), mask_value=-3.0)
+    # inject a one-off peak (same height as the real one) into a single curve
+    spike_curve = series.curves[3]
+    sel = np.abs(spike_curve.x - 8.5) < 0.25
+    spike_curve.y[sel] += 10.0
+
+    stack = stack_series(series)
+    stacked = find_peaks(stack, subtract_background=True)
+    top = max(stacked, key=lambda p: p["prominence"])
+    # stacking makes the persistent peak (~5, in every curve) dominate; the
+    # one-off at 8.5 is diluted by the number of curves and never wins
+    assert abs(top["x"] - 5.0) < 0.3
+    spike = [p for p in stacked if abs(p["x"] - 8.5) < 0.3]
+    assert not spike or spike[0]["prominence"] < top["prominence"] / 5
 
 
 def test_no_transition_on_smooth_trend():

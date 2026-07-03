@@ -76,6 +76,52 @@ def test_chat_tool_errors_flow_back(tmp_path):
     assert session.tool_trace[0]["error"]
 
 
+def series_files(tmp_path):
+    x = np.linspace(0, 10, 1200)
+    paths = []
+    for temp in np.arange(5, 100, 5.0):
+        center = 5.0 + (0.0 if temp < 50 else 0.004 * (temp - 50))
+        y = 1.0 + 10 * np.exp(-((x - center) ** 2) / 0.03)
+        y[:30] = -3.0  # masked sentinel
+        p = tmp_path / f"scan_T_base_{temp:.1f}K.dat"
+        np.savetxt(p, np.column_stack([x, y]))
+        paths.append(str(p))
+    return paths
+
+
+def test_chat_transition_question_drives_skill(tmp_path):
+    """A transition question should trigger skill_scan_series_transitions on the
+    whole glob, and the grounded reply reuses its verdict."""
+    import pytest
+
+    pytest.importorskip("matplotlib")
+    series_files(tmp_path)  # write the series to disk
+    glob = str(tmp_path / "*.dat")
+
+    captured = {}
+
+    def record(name, arguments, result):
+        captured["name"] = name
+        captured["result"] = result
+
+    llm = ScriptedLLM([
+        LLMResponse(tool_calls=[ToolCall(
+            name="skill_scan_series_transitions",
+            arguments={"paths": [glob], "fwhm_guess": 0.03}, id="s")]),
+        LLMResponse(content="Tracked the strongest peaks; a changepoint appears near 50 K."),
+    ])
+    session = ChatSession(llm=llm, model_id="scripted", workspace=tmp_path / "ws",
+                          on_tool_call=record)
+    reply = session.turn("Is there a phase transition across temperature?")
+
+    assert captured["name"] == "skill_scan_series_transitions"
+    assert captured["result"]["mask_value_used"] == -3.0  # auto-detected, not given
+    assert captured["result"]["verdict"]["transition_detected"]
+    assert "50" in reply
+    # the skill ran as a single tool call, not a hand-chained sequence
+    assert [t["tool"] for t in session.tool_trace] == ["skill_scan_series_transitions"]
+
+
 def test_chat_files_context_in_system_prompt(tmp_path):
     llm = ScriptedLLM([LLMResponse(content="ok")])
     session = ChatSession(llm=llm, workspace=tmp_path / "ws",

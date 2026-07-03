@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Transition tracing — robustness
+- `skill_scan_series_transitions` now *monitors* the strongest peaks across the
+  whole scan and reports each peak's center/FWHM/height change plus a plain
+  human-readable `summary`, not just a bare verdict.
+- Tracking candidates are picked from the **mean over the series**
+  (`stack_series`), so a peak present in only one curve (noise) is no longer
+  chosen for tracking.
+- The masked-region sentinel (e.g. −3.0) is **auto-detected** (`auto_mask_value`,
+  `load_series(mask_value="auto")`) from its repetition in the low tail, so the
+  transition is found even when the caller forgets to pass it. `inspect_series`
+  reports both the detected and the used value.
+- Chat prompt `chat/v3`: transition / "what changes with temperature" questions
+  are steered to the one skill on the whole file glob, with an explicit
+  instruction to report which peaks moved and the changepoint.
+
 ## 0.1.0 — 2026-07-03
 
 First working release: the tools-first foundation, built and validated

@@ -9,6 +9,7 @@ and detect changepoints — with uncertainties propagated from the fits.
 from __future__ import annotations
 
 import re
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -63,7 +64,8 @@ def load_series(
     """Load curves and their parameter values (parsed from filenames).
 
     ``mask_value``: exact sentinel used for masked points (e.g. -3.0 in
-    detector-masked regions); occurrences become NaN.
+    detector-masked regions); occurrences become NaN. Pass the string
+    ``"auto"`` to detect a repeated flat sentinel from the data itself.
     """
     entries = []
     for p in paths:
@@ -71,16 +73,80 @@ def load_series(
         value = extract_param(p.name)
         if value is None:
             raise ValueError(f"Cannot extract parameter value from filename: {p.name}")
-        curve = load_curve(p)
-        if mask_value is not None:
-            curve.y = np.where(curve.y == mask_value, np.nan, curve.y)
-        entries.append((value, curve))
+        entries.append((value, load_curve(p)))
     entries.sort(key=lambda e: e[0])
-    return Series1D(
+    series = Series1D(
         params=[e[0] for e in entries],
         curves=[e[1] for e in entries],
         param_label=param_label,
         meta={"source": str(Path(paths[0]).parent) if paths else ""},
+    )
+    if mask_value == "auto":
+        mask_value = auto_mask_value(series.curves)
+        series.meta["mask_value_detected"] = mask_value
+    if mask_value is not None:
+        apply_mask(series, float(mask_value))
+        series.meta["mask_value_used"] = float(mask_value)
+    return series
+
+
+def apply_mask(series: Series1D, value: float) -> None:
+    """Turn every point exactly equal to ``value`` into NaN, in place."""
+    for curve in series.curves:
+        curve.y = np.where(curve.y == value, np.nan, curve.y)
+
+
+def auto_mask_value(curves: list[Curve1D]) -> float | None:
+    """Detect a repeated flat sentinel (e.g. -3.0 in detector-masked regions).
+
+    The tell is not magnitude but *repetition*: real scattering intensities are
+    essentially unique, so a single exact value repeated hundreds of times in
+    the low tail of the data is a masking flag, not signal. A candidate must
+    (a) sit at or below the 2nd percentile, (b) be repeated many times, and
+    (c) appear in most curves. Returns None when nothing stands out, so it is
+    safe on clean data. Detection only — nothing is masked here.
+    """
+    arrays = [np.asarray(c.y, dtype=float).ravel() for c in curves]
+    finite = np.concatenate(arrays)
+    finite = finite[np.isfinite(finite)]
+    if finite.size < 50:
+        return None
+    low_tail = float(np.percentile(finite, 2.0))
+    min_count = max(10, int(0.01 * finite.size))
+    values, counts = np.unique(finite, return_counts=True)
+    best: tuple[int, float] | None = None
+    for value, count in zip(values, counts, strict=True):
+        if value > low_tail or count < min_count:
+            continue
+        n_curves = sum(1 for arr in arrays if np.any(arr == value))
+        if n_curves < max(2, len(arrays) // 2):
+            continue
+        if best is None or count > best[0]:
+            best = (int(count), float(value))
+    return best[1] if best else None
+
+
+def stack_series(series: Series1D) -> Curve1D:
+    """Average a series onto its common grid (a mean over the parameter axis).
+
+    Used to pick tracking candidates: a peak that persists across the whole
+    scan survives the average, while noise present in only one curve does not.
+    Falls back to the first curve if the curves are not on a shared grid.
+    """
+    ref = series.curves[0]
+    same_grid = all(
+        c.x.size == ref.x.size and np.allclose(c.x, ref.x, equal_nan=True)
+        for c in series.curves
+    )
+    if not same_grid:
+        return ref
+    stack = np.vstack([c.y for c in series.curves])
+    with warnings.catch_warnings():  # all-NaN columns (fully masked) -> NaN, expected
+        warnings.simplefilter("ignore", RuntimeWarning)
+        y_mean = np.nanmean(stack, axis=0)
+    return Curve1D(
+        x=ref.x.copy(), y=y_mean, xlabel=ref.xlabel, ylabel=ref.ylabel,
+        meta={"stacked_from": len(series.curves)},
     )
 
 

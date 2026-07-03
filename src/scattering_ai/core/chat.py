@@ -17,7 +17,7 @@ from pathlib import Path
 
 from scattering_ai.llm.base import LLMClient, Message
 
-CHAT_PROMPT_VERSION = "chat/v2"
+CHAT_PROMPT_VERSION = "chat/v3"
 
 CHAT_SYSTEM_PROMPT = """\
 You are a careful scattering-science assistant working interactively with a
@@ -38,6 +38,15 @@ Rules:
 - When a tool accepts multiple paths, pass a glob pattern or directory
   instead of retyping long filenames (typos in copied names break tools).
 - Be concise: a few sentences of prose, not a report, unless asked.
+
+Phase transitions in a temperature/field series: when asked whether there is
+a transition, to trace/find one, or what changes with temperature, call
+skill_scan_series_transitions ONCE on the whole set of files (pass the glob or
+directory). It monitors the strongest peaks across the entire range, picks the
+peaks and the masked-region sentinel for you, and reports each peak's shift
+plus a changepoint vote. Do not hand-pick one peak or chain the steps
+yourself. In your reply, state which peaks were tracked, how they moved, and
+the transition estimate (or that none stood out), and point to the plots.
 
 The final scientific judgment always belongs to the researcher.
 """

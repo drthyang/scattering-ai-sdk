@@ -104,6 +104,24 @@ def test_scan_series_transitions_skill_real(registry):
     assert 30 <= verdict["transition_estimate"] <= 55
     assert Path(result["plots"]["waterfall"]).exists()
     assert any(p.get("plot") for p in result["tracked_peaks"])
+    # a human-readable summary and per-peak monitoring are always present
+    assert str(verdict["transition_estimate"]).split(".")[0] in result["summary"]
+    monitored = [p["monitored"] for p in result["tracked_peaks"] if "monitored" in p]
+    assert any("center_shift" in m for m in monitored)
+
+
+@pytest.mark.skipif(len(SERIES) < 10, reason="GaNb4Se8 series not present")
+def test_scan_series_transitions_auto_masks_without_arg(registry):
+    """Robustness: the skill finds the transition even when the caller forgets
+    the -3.0 sentinel, by auto-detecting it."""
+    pytest.importorskip("matplotlib")
+    result = registry.execute(
+        "skill_scan_series_transitions",
+        {"paths": [str(p) for p in SERIES], "n_peaks": 3, "fwhm_guess": 0.03},
+    )
+    assert result["mask_value_used"] == -3.0  # detected, not passed
+    assert result["verdict"]["transition_detected"]
+    assert 30 <= result["verdict"]["transition_estimate"] <= 55
 
 
 @pytest.mark.skipif(not XRAY_GR.exists(), reason="real data not present")
