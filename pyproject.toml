@@ -38,6 +38,9 @@ path = "src/scattering_ai/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/scattering_ai"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"knowledge" = "scattering_ai/knowledge"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
