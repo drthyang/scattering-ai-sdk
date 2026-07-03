@@ -67,6 +67,18 @@ def test_slice_outside_range_raises(tmp_path):
 
 
 @pytest.mark.skipif(not REAL, reason="real CORELLI volume not present")
+def test_real_corelli_ring_candidates_include_aluminum():
+    from scattering_ai.tools.slices import detect_rings
+
+    vol = load_volume(REAL[0])
+    s = vol.slice(axis=0, center=0.0, thickness=0.5)
+    b, c = vol.lattice["b"], vol.lattice["c"]
+    result = detect_rings(s, x_scale=2 * np.pi / b, y_scale=2 * np.pi / c)
+    # Sample environment aluminum should be among the matched candidates
+    assert result["phase_match_counts"].get("Al", 0) >= 2
+
+
+@pytest.mark.skipif(not REAL, reason="real CORELLI volume not present")
 def test_real_corelli_volume():
     vol = load_volume(REAL[0])
     assert [ax.n_bins for ax in vol.axes] == [401, 401, 301]
