@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+.python-version
+
+# Testing / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# macOS
+.DS_Store
+
+# Local models, caches, and indexes
+*.gguf
+*.safetensors
+models/
+.cache/
+*.sqlite
+*.lance/
+chroma/
+
+# Test and report outputs
+outputs/
+reports_out/
+*.report.md
+*.report.json
+
+# Environment / secrets
+.env
+.env.*
+
+# Editors
+.idea/
+.vscode/
