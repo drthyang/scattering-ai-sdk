@@ -102,6 +102,12 @@ class Volume3D:
 
         remaining = [i for i in range(3) if i != i_axis]  # logical, ascending
         x_ax, y_ax = self.axes[remaining[0]], self.axes[remaining[1]]
+        origin = [0.0, 0.0, 0.0]
+        origin[i_axis] = float(center)
+        u_vec = [0.0, 0.0, 0.0]
+        u_vec[remaining[0]] = 1.0
+        v_vec = [0.0, 0.0, 0.0]
+        v_vec[remaining[1]] = 1.0
         # after removing numpy_axis, result is (y, x) = (higher, lower logical)
         return Slice2D(
             data=averaged,
@@ -115,6 +121,10 @@ class Volume3D:
                 "center": float(center),
                 "thickness": float(thickness),
                 "n_bins_integrated": int(in_slab.size),
+                "hkl_origin": origin,
+                "hkl_u": u_vec,
+                "hkl_v": v_vec,
+                "lattice": dict(self.lattice) if self.lattice else None,
             },
         )
 
@@ -219,11 +229,12 @@ class Volume3D:
             ylabel=f"t along {fmt(v_vec)} (r.l.u.)",
             meta={
                 "source": str(self.path),
-                "origin": [float(x) for x in origin_v],
-                "u_axis": [float(x) for x in u_vec],
-                "v_axis": [float(x) for x in v_vec],
                 "thickness": float(thickness),
                 "n_layers": int(len(offsets)),
+                "hkl_origin": [float(x) for x in origin_v],
+                "hkl_u": [float(x) for x in u_vec],
+                "hkl_v": [float(x) for x in v_vec],
+                "lattice": dict(self.lattice) if self.lattice else None,
             },
         )
 

@@ -379,7 +379,28 @@ scattering-ai analyze path/to/rmc_monitor_summary.json --domain rmc --out report
 
 #### C4 — MCP Server
 
-Expose the SDK's skills and diagnostics as MCP tools so any agent host (Claude Code, IDEs, other assistants) can drive scattering analysis. This turns the SDK from a library into infrastructure other AI systems can use.
+Expose the SDK as MCP tools so any agent host (Claude Code, IDEs, other
+assistants) can drive scattering analysis. This turns the SDK from a library
+into infrastructure other AI systems can use — the key step toward the
+universal-foundation goal: capability decoupled from interpretation, with the
+same tested core behind every door (Python API, CLI, MCP, app connectors).
+
+Plan:
+
+1. **Thin adapter, zero new logic**: `server/mcp.py` maps each `AgentTool`
+   in the registry to an MCP tool 1:1 (the registry's JSON schemas are the
+   single source of truth). Official `mcp` Python package, stdio transport,
+   launched via `scattering-ai mcp`.
+2. **Two tiers**: the individual data tools (a capable host model does its
+   own orchestration), plus one high-level `analyze` tool running the full
+   loop (diagnostics → RAG → local-LLM interpretation) for hosts that want
+   packaged behavior.
+3. **Same guarantees**: workspace artifacts, structured summaries, and
+   provenance identical to the built-in agent loop.
+- **Definition of Done:** Claude Code, connected via `claude mcp add`, can
+  slice the CORELLI volume, cut a profile, and fit peaks — chaining the
+  SDK's tools itself — and every number in its answer traces to a tool
+  result.
 
 #### C5 — App Connectors
 

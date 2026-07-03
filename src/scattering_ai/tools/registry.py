@@ -159,7 +159,8 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
         peaks = sl.find_peaks_2d(load_slice(slice_path), min_snr=min_snr)
         return {"n_peaks": len(peaks), "strongest": peaks[:20]}
 
-    def detect_rings_2d(slice_path: str, x_scale: float, y_scale: float) -> dict:
+    def detect_rings_2d(slice_path: str, x_scale: float | None = None,
+                        y_scale: float | None = None) -> dict:
         return sl.detect_rings(load_slice(slice_path), x_scale=x_scale, y_scale=y_scale)
 
     def line_cut_2d(slice_path: str, x0: float, y0: float, x1: float, y1: float,
@@ -299,12 +300,13 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
             AgentTool(
                 "detect_rings_2d",
                 "Find powder-ring candidates in a saved slice and match them against "
-                "known contaminants (Al/Cu/steel/V). x_scale/y_scale convert axis "
-                "units to 1/Angstrom (2*pi/lattice-constant for r.l.u. axes). "
+                "known contaminants (Al/Cu/steel/V). Slices cut from a volume carry "
+                "their lattice, so |Q| is exact (B matrix) and no scales are needed; "
+                "for bare slices pass x_scale/y_scale (axis units -> 1/Angstrom). "
                 "Low completeness = partial annulus = weak evidence.",
                 _params(
-                    {"slice_path": string, "x_scale": number, "y_scale": number},
-                    ["slice_path", "x_scale", "y_scale"],
+                    {"slice_path": string, "x_scale": opt_number, "y_scale": opt_number},
+                    ["slice_path"],
                 ),
                 detect_rings_2d,
             ),
