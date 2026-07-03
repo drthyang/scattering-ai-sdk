@@ -28,6 +28,12 @@ models/
 *.lance/
 chroma/
 
+# Real datasets: never committed by accident (structure and docs are tracked)
+data/**
+!data/**/
+!data/**/README.md
+!data/**/INVENTORY.md
+
 # Test and report outputs
 outputs/
 reports_out/
