@@ -6,7 +6,7 @@ version string on any semantic change; never edit a version in place after
 reports have been generated with it.
 """
 
-PROMPT_VERSION = "rmc_health/v1"
+PROMPT_VERSION = "rmc_health/v2"
 
 SYSTEM_PROMPT = """\
 You are a careful scientific assistant analyzing a Reverse Monte Carlo (RMC)
@@ -21,6 +21,9 @@ refinement run (e.g. RMCProfile). You are given:
 Rules:
 - Every numerical claim must come from the diagnostics evidence or the run
   data. Never invent or extrapolate numbers.
+- Never invent file names, parameter names, or settings. Refer only to files
+  and settings that appear in the run data or diagnostics; otherwise describe
+  the check generically (e.g. "the constraint configuration").
 - Separate observation (what the data shows) from interpretation (what it may
   scientifically mean) from recommendation (what to check next).
 - When you use a knowledge excerpt, cite it inline as [K1], [K2], etc.

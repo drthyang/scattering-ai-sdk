@@ -84,7 +84,7 @@ def test_llm_interpretation_is_used():
     assert "Rebalance dataset weights." in report.recommended_next_checks
     assert report.confidence == Confidence.MEDIUM
     assert report.provenance.model == "fake-model"
-    assert report.provenance.prompt_version == "rmc_health/v1"
+    assert report.provenance.prompt_version == "rmc_health/v2"
     # Diagnostics and knowledge were actually in the prompt
     prompt_text = fake.last_messages[1].content
     assert "DIAGNOSTICS" in prompt_text and "[K1]" in prompt_text
