@@ -92,7 +92,17 @@ def main(argv: list[str] | None = None) -> int:
     analyze_cmd.add_argument("--model", default="", help="Model name for the backend")
     analyze_cmd.add_argument("--base-url", default="", help="Override backend base URL")
 
+    mcp_cmd = sub.add_parser(
+        "mcp", help="Run the MCP server (stdio) exposing the SDK's tools to agent hosts"
+    )
+    mcp_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
+
     args = parser.parse_args(argv)
+    if args.command == "mcp":
+        from scattering_ai.server.mcp import serve
+
+        serve(workspace=args.workspace or None)
+        return 0
     request = _build_request(args)
     report = _build_agent(args).analyze(request)
 

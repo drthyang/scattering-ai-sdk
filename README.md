@@ -56,6 +56,25 @@ scattering-ai analyze --file my_pattern.gr \
     --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
 ```
 
+MCP server — expose the tools to any agent host (Claude Code, IDEs, ...):
+
+```bash
+claude mcp add scattering-ai -- scattering-ai mcp
+```
+
+The host model then chains the SDK's 12 data tools itself (volume slicing,
+line cuts, peak fitting, ring detection, series tracking), plus a high-level
+`analyze` tool running the full diagnostics → knowledge → report loop.
+
+Application connectors — apps own zero AI logic:
+
+```python
+from scattering_ai.connectors.rmc_monitor import analyze_monitor
+
+report = analyze_monitor(monitor_json)   # dict or path; returns AnalysisReport
+panel.show(report.markdown)
+```
+
 ## Design principles
 
 - Rule-based diagnostics run **before** LLM reasoning — everything detectable without an LLM is detected without an LLM.

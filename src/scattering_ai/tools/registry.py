@@ -111,7 +111,9 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
     def inspect_curve(path: str) -> dict:
         curve = load_curve(path)
         out = curve.summary()
-        out["detected_convention"] = c.detect_sq_convention(curve)
+        # convention (S(Q) vs S(Q)-1) only means something for Q-space data
+        if not curve.xlabel.lower().startswith("r"):
+            out["detected_convention"] = c.detect_sq_convention(curve)
         return out
 
     def find_peaks_1d(path: str, min_prominence: float | None = None,
