@@ -118,6 +118,115 @@ class Volume3D:
             },
         )
 
+    def oblique_slice(
+        self,
+        origin: tuple[float, float, float],
+        u_axis: tuple[float, float, float],
+        v_axis: tuple[float, float, float],
+        u_range: tuple[float, float],
+        v_range: tuple[float, float],
+        thickness: float = 0.0,
+        du: float | None = None,
+        dv: float | None = None,
+        n_layers: int = 5,
+    ) -> Slice2D:
+        """Cut an arbitrary plane: points = origin + s*u_axis + t*v_axis.
+
+        All vectors are in the volume's logical (HKL / r.l.u.) coordinates,
+        Mantid-BinMD style: the slab is defined in index space, and
+        ``thickness`` is measured along the u x v cross product normalized in
+        the r.l.u. metric — for axis-aligned cuts this matches ``slice()``.
+        Only the bounding box of the requested grid is read from disk.
+        """
+        import h5py
+
+        origin_v = np.asarray(origin, dtype=float)
+        u_vec = np.asarray(u_axis, dtype=float)
+        v_vec = np.asarray(v_axis, dtype=float)
+        normal = np.cross(u_vec, v_vec)
+        norm = np.linalg.norm(normal)
+        if norm == 0:
+            raise ValueError("u_axis and v_axis are parallel")
+        normal /= norm
+
+        steps = np.array([float(np.median(np.diff(ax.centers))) for ax in self.axes])
+        s_vals = np.arange(u_range[0], u_range[1] + 1e-12,
+                           du or float(np.min(steps / np.maximum(np.abs(u_vec), 1e-12))))
+        t_vals = np.arange(v_range[0], v_range[1] + 1e-12,
+                           dv or float(np.min(steps / np.maximum(np.abs(v_vec), 1e-12))))
+        offsets = (
+            np.linspace(-thickness / 2, thickness / 2, n_layers) if thickness > 0
+            else np.array([0.0])
+        )
+
+        # hkl sample points, shape (n_layers, nt, ns, 3)
+        grid = (
+            origin_v[None, None, None, :]
+            + s_vals[None, None, :, None] * u_vec[None, None, None, :]
+            + t_vals[None, :, None, None] * v_vec[None, None, None, :]
+            + offsets[:, None, None, None] * normal[None, None, None, :]
+        )
+
+        # logical axis -> fractional bin index (uniform grids)
+        firsts = np.array([ax.centers[0] for ax in self.axes])
+        frac = (grid - firsts) / steps  # index along logical axes 0,1,2
+
+        # bounding box in storage order (D2, D1, D0), padded for interpolation
+        lo, hi = [], []
+        n_bins = [ax.n_bins for ax in self.axes]
+        for logical in (2, 1, 0):
+            lo.append(int(np.clip(np.floor(frac[..., logical].min()) - 1, 0,
+                                  n_bins[logical] - 1)))
+            hi.append(int(np.clip(np.ceil(frac[..., logical].max()) + 2, 1,
+                                  n_bins[logical])))
+        with h5py.File(self.path, "r") as f:
+            data_group = f[f"{_GROUP}/data"]
+            sub = data_group["signal"][lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]].astype(float)
+            if "mask" in data_group:
+                masked = data_group["mask"][lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]] == 1
+                sub[masked] = np.nan
+
+        from scipy import ndimage
+
+        coords = np.stack(
+            [frac[..., 2] - lo[0], frac[..., 1] - lo[1], frac[..., 0] - lo[2]]
+        ).reshape(3, -1)
+        finite = np.isfinite(sub)
+        filled = np.where(finite, sub, 0.0)
+        values = ndimage.map_coordinates(filled, coords, order=1, mode="constant", cval=np.nan)
+        weights = ndimage.map_coordinates(
+            finite.astype(float), coords, order=1, mode="constant", cval=0.0
+        )
+        shape = grid.shape[:3]
+        values = values.reshape(shape)
+        weights = weights.reshape(shape)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            sampled = np.where(weights > 0.5, values / np.maximum(weights, 1e-12), np.nan)
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                averaged = np.nanmean(sampled, axis=0)  # over layers -> (nt, ns)
+
+        def fmt(vec) -> str:
+            return "[" + ",".join(f"{x:g}" for x in vec) + "]"
+
+        return Slice2D(
+            data=averaged,
+            x_centers=s_vals,
+            y_centers=t_vals,
+            xlabel=f"s along {fmt(u_vec)} (r.l.u.)",
+            ylabel=f"t along {fmt(v_vec)} (r.l.u.)",
+            meta={
+                "source": str(self.path),
+                "origin": [float(x) for x in origin_v],
+                "u_axis": [float(x) for x in u_vec],
+                "v_axis": [float(x) for x in v_vec],
+                "thickness": float(thickness),
+                "n_layers": int(len(offsets)),
+            },
+        )
+
     def _axis_index(self, axis: int | str) -> int:
         if isinstance(axis, int):
             if axis not in (0, 1, 2):

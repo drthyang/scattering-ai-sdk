@@ -144,6 +144,17 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
         _save_slice(s, out_path)
         return {"saved": str(out_path), "summary": s.summary()}
 
+    def oblique_slice_volume(path: str, origin: list[float], u_axis: list[float],
+                             v_axis: list[float], u_min: float, u_max: float,
+                             v_min: float, v_max: float, thickness: float = 0.0) -> dict:
+        s = load_volume(path).oblique_slice(
+            origin=tuple(origin), u_axis=tuple(u_axis), v_axis=tuple(v_axis),
+            u_range=(u_min, u_max), v_range=(v_min, v_max), thickness=thickness,
+        )
+        out_path = artifact("oblique", ".npz")
+        _save_slice(s, out_path)
+        return {"saved": str(out_path), "summary": s.summary()}
+
     def find_peaks_2d(slice_path: str, min_snr: float = 10.0) -> dict:
         peaks = sl.find_peaks_2d(load_slice(slice_path), min_snr=min_snr)
         return {"n_peaks": len(peaks), "strongest": peaks[:20]}
@@ -260,6 +271,24 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
                     ["path", "axis", "center", "thickness"],
                 ),
                 slice_volume,
+            ),
+            AgentTool(
+                "oblique_slice_volume",
+                "Cut an arbitrary plane from a 3D volume: points = origin + s*u_axis "
+                "+ t*v_axis (all in r.l.u./HKL), integrating over thickness along the "
+                "plane normal. For cuts not aligned with the volume axes.",
+                _params(
+                    {"path": string,
+                     "origin": {"type": "array", "items": number},
+                     "u_axis": {"type": "array", "items": number},
+                     "v_axis": {"type": "array", "items": number},
+                     "u_min": number, "u_max": number,
+                     "v_min": number, "v_max": number,
+                     "thickness": number},
+                    ["path", "origin", "u_axis", "v_axis", "u_min", "u_max",
+                     "v_min", "v_max"],
+                ),
+                oblique_slice_volume,
             ),
             AgentTool(
                 "find_peaks_2d",

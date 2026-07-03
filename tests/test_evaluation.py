@@ -150,8 +150,7 @@ def test_tool_provenance_invariant(tmp_path):
 def test_live_fit_request_actually_fits(tmp_path):
     """Behavioral eval for data_analysis/v2: a question demanding fitted
     values must produce a fit_peaks_1d call."""
-    from scattering_ai import Agent
-    from scattering_ai import AnalysisRequest
+    from scattering_ai import Agent, AnalysisRequest
     from scattering_ai.core.config import SDKConfig
     from scattering_ai.llm.openai_compatible import OpenAICompatibleClient
 
