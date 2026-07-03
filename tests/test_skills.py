@@ -63,6 +63,34 @@ def test_characterize_slice_requires_cut_or_slice(registry):
     assert "error" in result
 
 
+def test_series_paths_accept_globs_and_dirs(registry, tmp_path):
+    """Regression: gemma4:26b corrupted filenames when retyping 20 long
+    paths; series tools must accept globs/directories instead."""
+    x = np.linspace(0, 10, 300)
+    for temp in (10.0, 20.0, 30.0, 40.0, 50.0):
+        y = np.exp(-((x - 5) ** 2) / 0.1)
+        np.savetxt(tmp_path / f"scan_T_base_{temp:.1f}K.dat", np.column_stack([x, y]))
+    (tmp_path / ".DS_Store").write_bytes(b"junk")  # macOS noise must be ignored
+    (tmp_path / "notes.md").write_text("not data")
+
+    via_glob = registry.execute("inspect_series", {"paths": [str(tmp_path / "*.dat")]})
+    assert via_glob["n_curves"] == 5
+    via_dir = registry.execute("inspect_series", {"paths": [str(tmp_path)]})
+    assert via_dir["n_curves"] == 5
+
+    typo = registry.execute("inspect_series", {"paths": [str(tmp_path / "nope_5.0K.dat")]})
+    assert "glob pattern" in typo["error"]  # error must teach the recovery
+
+
+def test_chat_files_context_compacts_to_glob(tmp_path):
+    from scattering_ai.core.chat import ChatSession
+
+    files = [f"/data/series/very_long_name_T_base_{t}.0K_suffix.dat" for t in range(20)]
+    context = ChatSession._files_context(files)
+    assert "/data/series/*.dat" in context
+    assert context.count("very_long_name") <= 3  # not the full listing
+
+
 @pytest.mark.skipif(len(SERIES) < 10, reason="GaNb4Se8 series not present")
 def test_scan_series_transitions_skill_real(registry):
     pytest.importorskip("matplotlib")

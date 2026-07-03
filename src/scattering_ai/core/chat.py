@@ -17,7 +17,7 @@ from pathlib import Path
 
 from scattering_ai.llm.base import LLMClient, Message
 
-CHAT_PROMPT_VERSION = "chat/v1"
+CHAT_PROMPT_VERSION = "chat/v2"
 
 CHAT_SYSTEM_PROMPT = """\
 You are a careful scattering-science assistant working interactively with a
@@ -35,6 +35,8 @@ Rules:
   and say when the evidence is insufficient.
 - Artifacts (slices, cuts, transforms) persist in the workspace across the
   conversation; reuse their paths instead of recomputing.
+- When a tool accepts multiple paths, pass a glob pattern or directory
+  instead of retyping long filenames (typos in copied names break tools).
 - Be concise: a few sentences of prose, not a report, unless asked.
 
 The final scientific judgment always belongs to the researcher.
@@ -64,12 +66,29 @@ class ChatSession:
 
         context = ""
         if files:
-            context = "\n\nFiles the researcher wants to work with:\n" + "\n".join(
-                f"- {f}" for f in files
-            )
+            context = self._files_context(files)
         self.messages = [
             Message(role="system", content=CHAT_SYSTEM_PROMPT + context)
         ]
+
+    @staticmethod
+    def _files_context(files: list[str]) -> str:
+        """Describe the files compactly: for a homogeneous set, give the glob
+        (retyping twenty 130-char filenames is how small models break)."""
+        dirs = {str(Path(f).parent) for f in files}
+        suffixes = {Path(f).suffix for f in files}
+        if len(files) > 4 and len(dirs) == 1 and len(suffixes) == 1:
+            directory, suffix = dirs.pop(), suffixes.pop()
+            glob_pattern = f"{directory}/*{suffix}"
+            sample = "\n".join(f"- {Path(f).name}" for f in files[:3])
+            return (
+                f"\n\nThe researcher wants to work with {len(files)} files in "
+                f"{directory}/. Pass the glob '{glob_pattern}' to series tools "
+                f"instead of listing names. First files:\n{sample}\n- ..."
+            )
+        return "\n\nFiles the researcher wants to work with:\n" + "\n".join(
+            f"- {f}" for f in files
+        )
 
     def turn(self, user_text: str) -> str:
         """One conversational turn: user text in, grounded assistant text out."""

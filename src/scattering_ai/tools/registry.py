@@ -202,10 +202,42 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         peaks = c.find_peaks(cut, subtract_background=False)
         return {"saved": str(out_path), "summary": cut.summary(), "peaks": peaks[:10]}
 
+    def _expand_paths(paths: list[str]) -> list[str]:
+        """Accept globs and directories, not just exact paths: small models
+        corrupt long filenames when forced to retype them."""
+        import glob as globlib
+
+        expanded: list[str] = []
+        for entry in paths:
+            p = Path(entry)
+            if any(ch in entry for ch in "*?["):
+                matches = sorted(globlib.glob(entry))
+                if not matches:
+                    raise FileNotFoundError(f"glob matched nothing: {entry}")
+                expanded += matches
+            elif p.is_dir():
+                expanded += sorted(
+                    str(f) for f in p.iterdir()
+                    if f.is_file() and not f.name.startswith(".")
+                    and f.suffix.lower() not in (".md", ".png")
+                )
+            else:
+                if not p.exists():
+                    raise FileNotFoundError(
+                        f"{entry} not found — pass a glob pattern (e.g. "
+                        f"'{p.parent}/*{p.suffix}') or a directory instead of "
+                        "retyping long filenames"
+                    )
+                expanded.append(entry)
+        seen: dict[str, None] = {}
+        for e in expanded:
+            seen.setdefault(e)
+        return list(seen)
+
     def inspect_series(paths: list[str], mask_value: float | None = None) -> dict:
         from scattering_ai.tools.series import load_series
 
-        series = load_series(paths, mask_value=mask_value)
+        series = load_series(_expand_paths(paths), mask_value=mask_value)
         out = series.summary()
         peaks = c.find_peaks(series.curves[0], subtract_background=True)
         out["peaks_in_first_curve"] = peaks[:10]
@@ -216,7 +248,7 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                           mask_value: float | None = None) -> dict:
         from scattering_ai.tools.series import detect_transition, load_series, track_peak
 
-        series = load_series(paths, mask_value=mask_value)
+        series = load_series(_expand_paths(paths), mask_value=mask_value)
         tracked = track_peak(series, center=center, fwhm_guess=fwhm_guess)
         good = [r for r in tracked["rows"] if r.get("ok")]
         result: dict = {
@@ -283,7 +315,7 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         from scattering_ai.tools.plotting import plot_series
         from scattering_ai.tools.series import load_series
 
-        series = load_series(paths, mask_value=mask_value)
+        series = load_series(_expand_paths(paths), mask_value=mask_value)
         saved = plot_series(series.curves, series.params,
                             artifact("series", ".png"),
                             param_label=series.param_label, xmin=xmin, xmax=xmax)
@@ -413,9 +445,11 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
             AgentTool(
                 "inspect_series",
                 "Load a parametric series of 1D files (temperature/field scan; the "
-                "parameter is parsed from filenames like 'T_base_5.0K'). Returns the "
-                "parameter values and the peaks found in the first curve. "
-                "mask_value: sentinel for masked points (e.g. -3.0).",
+                "parameter is parsed from filenames like 'T_base_5.0K'). paths may "
+                "be exact files, GLOB PATTERNS ('dir/*.dat' — preferred, avoids "
+                "retyping long names), or a directory. Returns the parameter values "
+                "and the peaks found in the first curve. mask_value: sentinel for "
+                "masked points (e.g. -3.0).",
                 _params(
                     {"paths": {"type": "array", "items": string}, "mask_value": opt_number},
                     ["paths"],
@@ -426,8 +460,9 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "track_peak_series",
                 "Fit one peak in every curve of a parametric series and track its "
                 "center/FWHM/height vs the parameter, then run changepoint detection "
-                "on center and FWHM trends. Use for transition hunting. Saves a "
-                "tracking plot when matplotlib is available.",
+                "on center and FWHM trends. Use for transition hunting. paths accepts "
+                "glob patterns or a directory. Saves a tracking plot when matplotlib "
+                "is available.",
                 _params(
                     {"paths": {"type": "array", "items": string}, "center": number,
                      "fwhm_guess": opt_number, "mask_value": opt_number},
@@ -466,7 +501,8 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
             AgentTool(
                 "plot_series_files",
                 "Render a parametric series of 1D files as a color-coded waterfall "
-                "PNG (optionally restricted to an x-range).",
+                "PNG (optionally restricted to an x-range). paths accepts glob "
+                "patterns or a directory.",
                 _params(
                     {"paths": {"type": "array", "items": string},
                      "mask_value": opt_number, "xmin": opt_number, "xmax": opt_number},
