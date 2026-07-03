@@ -59,4 +59,5 @@ def test_llm_client_protocol():
 
     assert isinstance(FakeClient(), LLMClient)
     message = Message(role="user", content="hello")
-    assert message.model_dump() == {"role": "user", "content": "hello"}
+    assert message.role == "user" and message.content == "hello"
+    assert message.tool_calls == [] and message.tool_call_id == ""

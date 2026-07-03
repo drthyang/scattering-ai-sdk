@@ -12,9 +12,17 @@ from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 
+class ToolCall(BaseModel):
+    name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    id: str = ""
+
+
 class Message(BaseModel):
     role: str  # "system" | "user" | "assistant" | "tool"
     content: str
+    tool_calls: list[ToolCall] = Field(default_factory=list)  # assistant messages
+    tool_call_id: str = ""  # tool-result messages
 
 
 class ToolSpec(BaseModel):
@@ -23,11 +31,6 @@ class ToolSpec(BaseModel):
     name: str
     description: str = ""
     parameters: dict[str, Any] = Field(default_factory=dict)
-
-
-class ToolCall(BaseModel):
-    name: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 class LLMResponse(BaseModel):

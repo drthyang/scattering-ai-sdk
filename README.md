@@ -50,6 +50,10 @@ CLI:
 ```bash
 scattering-ai analyze examples/rmc_monitor_demo/stalled_run.json               # offline
 scattering-ai analyze run.json --backend lmstudio --model m --out report.md   # with local LLM
+
+# tool-driven analysis of a data file: the agent inspects, cuts, and fits
+scattering-ai analyze --file my_pattern.gr \
+    --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
 ```
 
 ## Design principles

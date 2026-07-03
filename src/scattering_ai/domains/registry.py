@@ -45,8 +45,39 @@ def _rmc_pack() -> DomainPack:
     )
 
 
+def _data_pack() -> DomainPack:
+    from pathlib import Path
+
+    from scattering_ai.core.findings import Finding, Severity
+    from scattering_ai.domains.data import prompts
+
+    def run(request: AnalysisRequest) -> list[Finding]:
+        findings = []
+        for f in request.data.files:
+            if not Path(f).exists():
+                findings.append(
+                    Finding(
+                        diagnostic="missing_files",
+                        severity=Severity.ERROR,
+                        message=f"Input file not found: {f}",
+                        evidence={"path": f},
+                    )
+                )
+        return findings
+
+    return DomainPack(
+        name="data",
+        description="Generic tool-driven analysis of scattering data files",
+        run_diagnostics=run,
+        knowledge_dirs=["scattering"],
+        prompt_version=prompts.PROMPT_VERSION,
+        system_prompt=prompts.SYSTEM_PROMPT,
+    )
+
+
 _BUILTIN: dict[str, Callable[[], DomainPack]] = {
     "rmc": _rmc_pack,
+    "data": _data_pack,
 }
 
 

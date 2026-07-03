@@ -36,12 +36,28 @@ class OpenAICompatibleClient:
     def capabilities(self) -> ModelCapabilities:
         return self._capabilities
 
+    @staticmethod
+    def _serialize_message(message: Message) -> dict:
+        payload: dict = {"role": message.role, "content": message.content}
+        if message.tool_calls:
+            payload["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                }
+                for tc in message.tool_calls
+            ]
+        if message.tool_call_id:
+            payload["tool_call_id"] = message.tool_call_id
+        return payload
+
     def complete(
         self, messages: list[Message], tools: list[ToolSpec] | None = None
     ) -> LLMResponse:
         kwargs: dict = {
             "model": self.config.model,
-            "messages": [m.model_dump() for m in messages],
+            "messages": [self._serialize_message(m) for m in messages],
         }
         if tools and self._capabilities.tool_use:
             kwargs["tools"] = [
@@ -63,8 +79,9 @@ class OpenAICompatibleClient:
             ToolCall(
                 name=tc.function.name,
                 arguments=json.loads(tc.function.arguments or "{}"),
+                id=tc.id or f"call_{i}",
             )
-            for tc in (choice.message.tool_calls or [])
+            for i, tc in enumerate(choice.message.tool_calls or [])
         ]
         return LLMResponse(
             content=choice.message.content or "",

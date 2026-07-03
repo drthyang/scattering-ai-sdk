@@ -57,6 +57,12 @@ def _input_hash(request: AnalysisRequest) -> str:
     return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
+def _default_workspace() -> Path:
+    import tempfile
+
+    return Path(tempfile.mkdtemp(prefix="scattering_ai_"))
+
+
 def _parse_llm_json(content: str) -> dict | None:
     text = content.strip()
     if text.startswith("```"):
@@ -73,15 +79,19 @@ def _parse_llm_json(content: str) -> dict | None:
 
 
 class Agent:
+    MAX_TOOL_ROUNDS = 8
+
     def __init__(
         self,
         llm: LLMClient | None = None,
         model_id: str = "",
         knowledge_root: Path | str | None = None,
+        workspace: Path | str | None = None,
     ):
         self.llm = llm
         self.model_id = model_id
         self.knowledge_root = knowledge_root or default_knowledge_root()
+        self.workspace = workspace
 
     def analyze(self, request: AnalysisRequest) -> AnalysisReport:
         pack = get_domain(request.domain)
@@ -94,7 +104,7 @@ class Agent:
             {NEXT_CHECK_RULES[key] for f in findings if (key := _rule_key(f)) in NEXT_CHECK_RULES}
         )
 
-        summary, interpretation, llm_checks, confidence = self._interpret(
+        summary, interpretation, llm_checks, confidence, tool_records = self._interpret(
             request, pack, findings, chunks
         )
         next_checks = llm_checks + [c for c in rule_checks if c not in llm_checks]
@@ -109,6 +119,7 @@ class Agent:
             citations=[
                 Citation(source=r.chunk.path, section=r.chunk.section) for r in chunks
             ],
+            used_tools=sorted({t.tool for t in tool_records}),
             confidence=confidence,
             provenance=Provenance(
                 sdk_version=scattering_ai.__version__,
@@ -116,6 +127,7 @@ class Agent:
                 model=self.model_id if self.llm else "",
                 prompt_version=pack.prompt_version if self.llm else "",
                 retrieved_chunks=[r.citation for r in chunks],
+                tool_calls=tool_records,
                 timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             ),
         )
@@ -143,10 +155,16 @@ class Agent:
         pack: DomainPack,
         findings: list[Finding],
         chunks: list[RetrievedChunk],
-    ) -> tuple[str, list[str], list[str], Confidence]:
-        """Ask the LLM for summary/interpretation; empty results if no LLM."""
+    ) -> tuple[str, list[str], list[str], Confidence, list]:
+        """LLM interpretation, optionally with a tool-calling loop.
+
+        Returns (summary, interpretation, next_checks, confidence,
+        tool_call_records); empty results when no LLM is configured.
+        """
+        from scattering_ai.core.schemas import ToolCallRecord
+
         if self.llm is None:
-            return "", [], [], Confidence.LOW
+            return "", [], [], Confidence.LOW, []
 
         knowledge_block = "\n\n".join(
             f"[K{i + 1}] ({r.citation})\n{r.chunk.text}" for i, r in enumerate(chunks)
@@ -158,12 +176,44 @@ class Agent:
             f"KNOWLEDGE:\n{knowledge_block or '(no knowledge retrieved)'}\n\n"
             f"RUN DATA (structured input):\n{request.data.model_dump_json()}"
         )
-        response = self.llm.complete(
-            [
-                Message(role="system", content=pack.system_prompt),
-                Message(role="user", content=user_content),
-            ]
-        )
+        messages = [
+            Message(role="system", content=pack.system_prompt),
+            Message(role="user", content=user_content),
+        ]
+
+        registry = None
+        specs = None
+        if request.options.use_tools and self.llm.capabilities.tool_use:
+            from scattering_ai.tools.registry import default_toolkit
+
+            registry = default_toolkit(self.workspace or _default_workspace())
+            specs = registry.specs
+
+        records: list[ToolCallRecord] = []
+        response = self.llm.complete(messages, tools=specs)
+        rounds = 0
+        while registry is not None and response.tool_calls and rounds < self.MAX_TOOL_ROUNDS:
+            rounds += 1
+            messages.append(
+                Message(role="assistant", content=response.content,
+                        tool_calls=response.tool_calls)
+            )
+            for call in response.tool_calls:
+                result = registry.execute(call.name, call.arguments)
+                records.append(
+                    ToolCallRecord(
+                        tool=call.name,
+                        args_hash=hashlib.sha256(
+                            json.dumps(call.arguments, sort_keys=True).encode()
+                        ).hexdigest()[:12],
+                    )
+                )
+                messages.append(
+                    Message(role="tool", content=json.dumps(result, default=str),
+                            tool_call_id=call.id)
+                )
+            response = self.llm.complete(messages, tools=specs)
+
         parsed = _parse_llm_json(response.content)
         if parsed is None:
             return (
@@ -171,6 +221,7 @@ class Agent:
                 ["LLM interpretation unavailable: response was not valid JSON."],
                 [],
                 Confidence.LOW,
+                records,
             )
         try:
             confidence = Confidence(parsed.get("confidence", "low"))
@@ -182,6 +233,7 @@ class Agent:
             as_list(parsed.get("interpretation")),
             as_list(parsed.get("recommended_next_checks")),
             confidence,
+            records,
         )
 
 

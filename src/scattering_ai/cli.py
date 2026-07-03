@@ -18,6 +18,16 @@ from scattering_ai.core.schemas import AnalysisRequest
 
 
 def _build_request(args: argparse.Namespace) -> AnalysisRequest:
+    if args.input is None:
+        if not args.file:
+            sys.exit("error: provide an input JSON or one or more --file arguments")
+        if not args.question:
+            sys.exit("error: --question is required with --file")
+        return AnalysisRequest(
+            domain=args.domain or "data",
+            question=args.question,
+            data={"files": args.file},
+        )
     payload = json.loads(Path(args.input).read_text())
     if "domain" in payload and "question" in payload:
         request = AnalysisRequest.model_validate(payload)
@@ -32,8 +42,9 @@ def _build_request(args: argparse.Namespace) -> AnalysisRequest:
 
 
 def _build_agent(args: argparse.Namespace) -> Agent:
+    workspace = args.workspace or None
     if args.backend == "none":
-        return Agent()
+        return Agent(workspace=workspace)
     factories = {
         "lmstudio": SDKConfig.lm_studio,
         "ollama": SDKConfig.ollama,
@@ -50,6 +61,7 @@ def _build_agent(args: argparse.Namespace) -> Agent:
     return Agent(
         llm=OpenAICompatibleClient(config),
         model_id=f"{args.backend}:{config.model or 'default'}",
+        workspace=workspace,
     )
 
 
@@ -58,8 +70,16 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     analyze_cmd = sub.add_parser("analyze", help="Analyze a scientific state JSON file")
-    analyze_cmd.add_argument("input", help="AnalysisRequest JSON or bare data payload")
-    analyze_cmd.add_argument("--domain", default="", help="Domain (e.g. rmc)")
+    analyze_cmd.add_argument(
+        "input", nargs="?", default=None,
+        help="AnalysisRequest JSON or bare data payload (optional with --file)",
+    )
+    analyze_cmd.add_argument(
+        "--file", action="append", default=[],
+        help="Data file to analyze with tools (repeatable; implies --domain data)",
+    )
+    analyze_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
+    analyze_cmd.add_argument("--domain", default="", help="Domain (e.g. rmc, data)")
     analyze_cmd.add_argument("--question", default="", help="Question to answer")
     analyze_cmd.add_argument("--out", default="", help="Write Markdown report to this path")
     analyze_cmd.add_argument("--json-out", default="", help="Write JSON report to this path")
