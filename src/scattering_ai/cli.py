@@ -65,6 +65,40 @@ def _build_agent(args: argparse.Namespace) -> Agent:
     )
 
 
+def _run_plot(args: argparse.Namespace) -> str:
+    from scattering_ai.tools import plotting
+
+    paths = args.paths
+    out = args.out or str(Path(paths[0]).with_suffix(".png"))
+
+    if len(paths) > 1:  # series waterfall
+        from scattering_ai.tools.series import load_series
+
+        series = load_series(paths, mask_value=args.mask_value)
+        return plotting.plot_series(series.curves, series.params, out,
+                                    param_label=series.param_label)
+
+    path = paths[0]
+    if path.endswith(".npz"):  # saved slice
+        from scattering_ai.tools.registry import load_slice
+
+        return plotting.plot_slice(load_slice(path), out, log=args.log)
+
+    import numpy as np
+
+    from scattering_ai.tools.curves import find_peaks, fit_peaks
+    from scattering_ai.tools.io import load_curve
+
+    curve = load_curve(path)
+    if args.mask_value is not None:
+        curve.y = np.where(curve.y == args.mask_value, np.nan, curve.y)
+    if args.fit:
+        centers = [float(c) for c in args.fit.split(",")]
+        return plotting.plot_fit(curve, fit_peaks(curve, centers=centers), out)
+    peaks = find_peaks(curve, subtract_background=True)
+    return plotting.plot_curve(curve, out, peaks=peaks, logy=args.log)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="scattering-ai")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -97,11 +131,40 @@ def main(argv: list[str] | None = None) -> int:
     )
     mcp_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
 
+    serve_cmd = sub.add_parser("serve", help="Run the HTTP API (FastAPI/uvicorn)")
+    serve_cmd.add_argument("--host", default="127.0.0.1")
+    serve_cmd.add_argument("--port", type=int, default=8551)
+    serve_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
+
+    plot_cmd = sub.add_parser(
+        "plot",
+        help="Quick-look plots: 1D files (peaks marked), .npz slices, or a series "
+        "of files (waterfall)",
+    )
+    plot_cmd.add_argument("paths", nargs="+", help="Data file(s); several 1D files = series")
+    plot_cmd.add_argument("--out", default="", help="Output PNG path (default: alongside input)")
+    plot_cmd.add_argument("--log", action="store_true", help="Log intensity scale")
+    plot_cmd.add_argument("--mask-value", type=float, default=None,
+                          help="Sentinel value for masked points (e.g. -3.0)")
+    plot_cmd.add_argument("--fit", default="",
+                          help="Comma-separated centers: fit peaks there and plot the fit")
+
     args = parser.parse_args(argv)
     if args.command == "mcp":
         from scattering_ai.server.mcp import serve
 
         serve(workspace=args.workspace or None)
+        return 0
+    if args.command == "serve":
+        import uvicorn
+
+        from scattering_ai.server.api import create_app
+
+        uvicorn.run(create_app(workspace=args.workspace or None),
+                    host=args.host, port=args.port)
+        return 0
+    if args.command == "plot":
+        print(f"Plot written to: {_run_plot(args)}")
         return 0
     request = _build_request(args)
     report = _build_agent(args).analyze(request)

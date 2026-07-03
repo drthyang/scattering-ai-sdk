@@ -56,6 +56,21 @@ scattering-ai analyze --file my_pattern.gr \
     --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
 ```
 
+Quick-look plots for judging results (peaks, fits with residuals, slices, series):
+
+```bash
+scattering-ai plot my_pattern.gr                          # curve + detected peaks
+scattering-ai plot my_pattern.gr --fit "2.64,3.73"        # fit + residual panel
+scattering-ai plot slice.npz --log                        # 2D slice
+scattering-ai plot series_*K.dat --mask-value=-3.0        # waterfall vs T
+```
+
+HTTP API (`pip install ".[api]"`):
+
+```bash
+scattering-ai serve --port 8551    # GET /health /tools, POST /tools/{name} /analyze
+```
+
 MCP server — expose the tools to any agent host (Claude Code, IDEs, ...):
 
 ```bash

@@ -28,10 +28,86 @@ _LABEL_SPLIT = re.compile(r"\s{2,}|\t")
 def load_curve(path: str | Path) -> Curve1D:
     """Load a 1D curve, sniffing the format from content."""
     path = Path(path)
+    with path.open("rb") as f:
+        magic = f.read(8)
+    if magic.startswith(b"\x89HDF"):
+        return _load_nexus_curve(path)
     text = path.read_text()
     if _PDFGETX_MARKER in text:
         return _load_pdfgetx(path, text)
     return _load_columns(path, text)
+
+
+def _load_nexus_curve(path: Path) -> Curve1D:
+    """1D signal from a NeXus/HDF5 file via NXdata conventions.
+
+    Follows the file's ``default`` attributes when present, otherwise takes
+    the first NXdata group found; ``signal``/``axes`` attributes name the
+    datasets. Requires h5py (``[volumes]`` extra).
+    """
+    try:
+        import h5py
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "Reading NeXus/HDF5 curves requires h5py: "
+            "pip install scattering-ai-sdk[volumes]"
+        ) from exc
+
+    def as_str(value) -> str:
+        return value.decode() if isinstance(value, bytes) else str(value)
+
+    with h5py.File(path, "r") as f:
+
+        def find_nxdata(group):
+            default = group.attrs.get("default")
+            if default is not None and as_str(default) in group:
+                child = group[as_str(default)]
+                if as_str(child.attrs.get("NX_class", "")) == "NXdata":
+                    return child
+                return find_nxdata(child)
+            for child in group.values():
+                if isinstance(child, h5py.Group):
+                    if as_str(child.attrs.get("NX_class", "")) == "NXdata":
+                        return child
+                    found = find_nxdata(child)
+                    if found is not None:
+                        return found
+            return None
+
+        nxdata = find_nxdata(f)
+        if nxdata is None:
+            raise ValueError(f"No NXdata group found in {path}")
+        signal_name = as_str(nxdata.attrs.get("signal", "data"))
+        if signal_name not in nxdata:
+            raise ValueError(f"NXdata signal '{signal_name}' missing in {path}")
+        y = np.asarray(nxdata[signal_name][()], dtype=float).squeeze()
+        if y.ndim != 1:
+            raise ValueError(
+                f"{path}: NXdata signal is {y.ndim}D; load_curve handles 1D "
+                "(use load_volume for MDHisto volumes)"
+            )
+        axes_attr = nxdata.attrs.get("axes")
+        x_name = None
+        if axes_attr is not None:
+            first = axes_attr[0] if isinstance(axes_attr, (list, np.ndarray)) else axes_attr
+            x_name = as_str(first)
+        if x_name and x_name != "." and x_name in nxdata:
+            x = np.asarray(nxdata[x_name][()], dtype=float).squeeze()
+            if x.size == y.size + 1:  # bin edges
+                x = (x[:-1] + x[1:]) / 2
+            xlabel = x_name
+            units = nxdata[x_name].attrs.get("units")
+            if units is not None:
+                xlabel = f"{x_name} ({as_str(units)})"
+        else:
+            x, xlabel = np.arange(y.size, dtype=float), "index"
+        errors_name = f"{signal_name}_errors"
+        e = (np.asarray(nxdata[errors_name][()], dtype=float).squeeze()
+             if errors_name in nxdata else None)
+        return Curve1D(
+            x=x, y=y, e=e, xlabel=xlabel, ylabel=signal_name,
+            meta={"source": str(path), "format": "nexus", "nxdata": nxdata.name},
+        )
 
 
 def _load_pdfgetx(path: Path, text: str) -> Curve1D:

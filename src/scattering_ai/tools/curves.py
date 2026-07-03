@@ -244,6 +244,15 @@ def detect_sq_convention(curve: Curve1D) -> str:
     return "unknown"
 
 
+def evaluate_fit(x: np.ndarray, fit_result: dict[str, Any]) -> np.ndarray:
+    """Reconstruct the fitted model (peaks + linear background) on ``x``."""
+    background = fit_result["background"]
+    y = background["slope"] * np.asarray(x, dtype=float) + background["intercept"]
+    for peak in fit_result["peaks"]:
+        y = y + _pseudo_voigt(x, peak["height"], peak["center"], peak["fwhm"], peak["eta"])
+    return y
+
+
 def sq_to_gr(
     curve: Curve1D,
     qmin: float | None = None,

@@ -140,6 +140,18 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
     def inspect_volume(path: str) -> dict:
         return load_volume(path).summary()
 
+    def inspect_cif(path: str, d_min: float = 1.0) -> dict:
+        from scattering_ai.tools.cif import lattice_from_cif, predicted_d_spacings, read_cif
+
+        info = read_cif(path)
+        lattice = lattice_from_cif(path)
+        return {
+            "cell": {k: info[k] for k in ("a", "b", "c", "alpha", "beta", "gamma")},
+            "space_group": info.get("space_group", ""),
+            "formula": info.get("formula", ""),
+            "predicted_d_spacings": predicted_d_spacings(lattice, d_min=d_min),
+        }
+
     def slice_volume(path: str, axis: int, center: float, thickness: float) -> dict:
         s = load_volume(path).slice(axis=axis, center=center, thickness=thickness)
         out_path = artifact(f"slice_ax{axis}", ".npz")
@@ -163,7 +175,17 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
 
     def detect_rings_2d(slice_path: str, x_scale: float | None = None,
                         y_scale: float | None = None) -> dict:
-        return sl.detect_rings(load_slice(slice_path), x_scale=x_scale, y_scale=y_scale)
+        s = load_slice(slice_path)
+        result = sl.detect_rings(s, x_scale=x_scale, y_scale=y_scale)
+        try:
+            from scattering_ai.tools.plotting import plot_profile
+
+            profile = sl.azimuthal_profile(s, x_scale, y_scale, statistic=25)
+            result["plot"] = plot_profile(profile, artifact("ring_profile", ".png"),
+                                          rings=result["rings"])
+        except ImportError:
+            pass
+        return result
 
     def line_cut_2d(slice_path: str, x0: float, y0: float, x1: float, y1: float,
                     width: float = 0.0) -> dict:
@@ -208,7 +230,57 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
                 [r["param"] for r in good], [r["fwhm"] for r in good],
                 [r["fwhm_err"] for r in good],
             )
+        try:
+            from scattering_ai.tools.plotting import plot_tracking
+
+            result["plot"] = plot_tracking(
+                tracked, artifact("tracking", ".png"),
+                transitions={
+                    "center": result.get("transition_on_center"),
+                    "fwhm": result.get("transition_on_fwhm"),
+                },
+            )
+        except ImportError:
+            pass
         return result
+
+    def plot_1d(path: str, logy: bool = False, mark_peaks: bool = True) -> dict:
+        from scattering_ai.tools.plotting import plot_curve
+
+        curve = _load_1d(path)
+        peaks = c.find_peaks(curve, subtract_background=True) if mark_peaks else []
+        saved = plot_curve(curve, artifact("curve", ".png"), peaks=peaks, logy=logy)
+        return {"saved": saved, "n_peaks_marked": len(peaks)}
+
+    def plot_fit_1d(path: str, centers: list[float],
+                    fwhm_guess: float | None = None,
+                    window: float | None = None) -> dict:
+        from scattering_ai.tools.plotting import plot_fit
+
+        curve = _load_1d(path)
+        fit = c.fit_peaks(curve, centers=centers, fwhm_guess=fwhm_guess, window=window)
+        fit["plot"] = plot_fit(curve, fit, artifact("fit", ".png"))
+        return fit
+
+    def plot_slice_2d(slice_path: str, log: bool = False,
+                      mark_peaks: bool = False) -> dict:
+        from scattering_ai.tools.plotting import plot_slice
+
+        s = load_slice(slice_path)
+        peaks = sl.find_peaks_2d(s) if mark_peaks else []
+        saved = plot_slice(s, artifact("slice_plot", ".png"), log=log, peaks=peaks)
+        return {"saved": saved, "summary": s.summary(), "n_peaks_marked": len(peaks)}
+
+    def plot_series_files(paths: list[str], mask_value: float | None = None,
+                          xmin: float | None = None, xmax: float | None = None) -> dict:
+        from scattering_ai.tools.plotting import plot_series
+        from scattering_ai.tools.series import load_series
+
+        series = load_series(paths, mask_value=mask_value)
+        saved = plot_series(series.curves, series.params,
+                            artifact("series", ".png"),
+                            param_label=series.param_label, xmin=xmin, xmax=xmax)
+        return {"saved": saved, "summary": series.summary()}
 
     number = {"type": "number"}
     opt_number = {"type": ["number", "null"]}
@@ -263,6 +335,14 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
                 "Describe a 3D reciprocal-space volume (.nxs): axes, ranges, unit cell.",
                 _params({"path": string}, ["path"]),
                 inspect_volume,
+            ),
+            AgentTool(
+                "inspect_cif",
+                "Read a CIF: unit cell, space group, formula, and geometrically "
+                "allowed d-spacings/Q positions (no intensities) for matching "
+                "observed peaks against a known structure.",
+                _params({"path": string, "d_min": number}, ["path"]),
+                inspect_cif,
             ),
             AgentTool(
                 "slice_volume",
@@ -339,13 +419,53 @@ def default_toolkit(workspace: str | Path) -> ToolRegistry:
                 "track_peak_series",
                 "Fit one peak in every curve of a parametric series and track its "
                 "center/FWHM/height vs the parameter, then run changepoint detection "
-                "on center and FWHM trends. Use for transition hunting.",
+                "on center and FWHM trends. Use for transition hunting. Saves a "
+                "tracking plot when matplotlib is available.",
                 _params(
                     {"paths": {"type": "array", "items": string}, "center": number,
                      "fwhm_guess": opt_number, "mask_value": opt_number},
                     ["paths", "center"],
                 ),
                 track_peak_series,
+            ),
+            AgentTool(
+                "plot_1d",
+                "Render a 1D data file or saved cut to a PNG, marking detected peaks. "
+                "Use so the user can visually judge the data.",
+                _params({"path": string, "logy": {"type": "boolean"},
+                         "mark_peaks": {"type": "boolean"}}, ["path"]),
+                plot_1d,
+            ),
+            AgentTool(
+                "plot_fit_1d",
+                "Fit pseudo-Voigt peaks at the given centers AND render a "
+                "data+model+residual PNG with fitted values annotated. Prefer this "
+                "over fit_peaks_1d when the user wants to see the fit.",
+                _params(
+                    {"path": string, "centers": {"type": "array", "items": number},
+                     "fwhm_guess": opt_number, "window": opt_number},
+                    ["path", "centers"],
+                ),
+                plot_fit_1d,
+            ),
+            AgentTool(
+                "plot_slice_2d",
+                "Render a saved 2D slice (.npz) to a PNG (optionally log scale, "
+                "optionally marking detected peaks).",
+                _params({"slice_path": string, "log": {"type": "boolean"},
+                         "mark_peaks": {"type": "boolean"}}, ["slice_path"]),
+                plot_slice_2d,
+            ),
+            AgentTool(
+                "plot_series_files",
+                "Render a parametric series of 1D files as a color-coded waterfall "
+                "PNG (optionally restricted to an x-range).",
+                _params(
+                    {"paths": {"type": "array", "items": string},
+                     "mask_value": opt_number, "xmin": opt_number, "xmax": opt_number},
+                    ["paths"],
+                ),
+                plot_series_files,
             ),
         ]
     )
