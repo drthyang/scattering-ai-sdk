@@ -68,6 +68,21 @@ def diagnose_file(path: str, workspace=None) -> list[Finding]:
         evidence={**fs, "n_atoms": meta["n_atoms"], "n_asymmetric": meta["n_asymmetric"]},
     )]
 
+    if workspace is not None:
+        try:
+            from scattering_ai.tools.structure_viz import plot_structure
+
+            img = plot_structure(lattice, positions, species,
+                                 Path(workspace) / "structure.png",
+                                 moments=meta.get("moments"), title=Path(path).stem)
+            findings.append(Finding(
+                diagnostic="structure_figure", severity=Severity.INFO,
+                message="Rendered the unit cell with atoms"
+                + (" and magnetic moments" if meta.get("moments") else "") + ".",
+                evidence={"figures": [img]}))
+        except Exception:
+            pass
+
     figures: list[str] = []
     try:
         tree = sym.maximal_subgroups(lattice, positions, species)

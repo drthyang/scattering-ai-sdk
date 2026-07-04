@@ -30,6 +30,7 @@ class AgentTool:
     description: str
     parameters: dict[str, Any]
     fn: Callable[..., dict[str, Any]]
+    category: str = ""  # skills group under this; "" for plain data tools
 
     @property
     def spec(self) -> ToolSpec:
@@ -46,6 +47,15 @@ class ToolRegistry:
     @property
     def specs(self) -> list[ToolSpec]:
         return [t.spec for t in self._tools.values()]
+
+    def skills_by_category(self) -> dict[str, list[str]]:
+        """Skill (``skill_*``) tool names grouped by their category, for a
+        readable overview of what composite workflows are available."""
+        grouped: dict[str, list[str]] = {}
+        for tool in self._tools.values():
+            if tool.name.startswith("skill_"):
+                grouped.setdefault(tool.category or "general", []).append(tool.name)
+        return {k: sorted(v) for k, v in sorted(grouped.items())}
 
     def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Run a tool; errors come back as structured results, never raises."""
@@ -375,6 +385,22 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         lat, pos, sp = _structure(path)
         return sym.magnetic_symmetry(lat, pos, sp, magmoms)
 
+    def plot_structure(path: str, bonds: bool = True) -> dict:
+        from scattering_ai.tools.cif import read_structure
+        from scattering_ai.tools.structure_viz import plot_structure as _plot
+
+        s = read_structure(path)
+        try:
+            saved = _plot(s["lattice"], s["positions"], s["species"],
+                          artifact("structure", ".png"), moments=s.get("moments"),
+                          bonds=bonds, title=Path(path).stem)
+        except ImportError:
+            return {"error": "structure plotting needs matplotlib ([plots] extra)"}
+        return {"saved": saved, "n_atoms": s["n_atoms"],
+                "n_magnetic": s.get("n_magnetic", 0),
+                "species": sorted(set(s["species"])),
+                "space_group_cif": s.get("space_group_cif", "")}
+
     number = {"type": "number"}
     opt_number = {"type": ["number", "null"]}
     string = {"type": "string"}
@@ -598,6 +624,14 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                     ["path", "magmoms"],
                 ),
                 magnetic_symmetry,
+            ),
+            AgentTool(
+                "plot_structure",
+                "Render a crystal structure (CIF/mCIF) to a PNG: unit cell, "
+                "element-coloured atoms, bonds, and magnetic moment arrows for an "
+                "mCIF. Returns the image path and a structure summary.",
+                _params({"path": string, "bonds": {"type": "boolean"}}, ["path"]),
+                plot_structure,
             ),
         ]
     )

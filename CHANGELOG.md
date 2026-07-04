@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Structure visualization + organized skills
+- **CIF/mCIF visualization** (`plot_structure` tool, `skill_visualize_structure`):
+  a matplotlib 3D render of the unit cell — element-coloured atoms, bonds, and
+  magnetic moment arrows for an mCIF. The CIF reader now parses `_atom_site_moment`
+  (mCIF) and transforms moments as axial vectors on symmetry expansion. The
+  `symmetry` domain report now includes a structure figure alongside the subgroup
+  tree.
+- **Skills reorganized by category** into per-module files (`patterns`, `series`,
+  `slices`, `structure`) with a `category` tag; `register_skills` aggregates them
+  and `ToolRegistry.skills_by_category()` gives a readable overview. Domain packs
+  and third parties add skill modules the same way.
+
 ### Symmetry domain pack (B4 — third technique pack)
 - New `symmetry` domain (spglib-backed, `[symmetry]` extra) for crystal
   structures (CIF), auto-routed from `.cif`/`.mcif`:

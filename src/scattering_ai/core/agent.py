@@ -30,7 +30,7 @@ from scattering_ai.llm.base import LLMClient, Message
 from scattering_ai.rag.retriever import KnowledgeBase, RetrievedChunk, default_knowledge_root
 
 # Findings that exist only to attach a figure — kept out of the prose observations.
-_FIGURE_ONLY = {"pdf_summary_figure", "diffuse_summary_figure"}
+_FIGURE_ONLY = {"pdf_summary_figure", "diffuse_summary_figure", "structure_figure"}
 
 
 def _rule_key(finding: Finding) -> str:

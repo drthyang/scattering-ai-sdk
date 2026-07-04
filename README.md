@@ -25,7 +25,7 @@ fully offline with local models.
 | A **T/field scan** of patterns | Whether there's a **phase transition**, its T_c, and which peaks move | waterfall + peak tracking |
 | A **G(r) / S(Q)** curve | Non-standard/inverted G(r), low-r artifacts, first-neighbour distance, S(Q) vs S(Q)−1 | overview plot |
 | A **diffuse volume / slice** | Bragg-vs-diffuse character, contaminant powder rings, Bragg-punch coverage, sampling anisotropy | log-scale map |
-| A **crystal structure (CIF)** | Space group + Wyckoff sites, **maximal subgroups** (phase-transition pathways), pseudosymmetric parent, magnetic space group | subgroup tree |
+| A **crystal structure (CIF/mCIF)** | Space group + Wyckoff sites, **maximal subgroups** (phase-transition pathways), pseudosymmetric parent, magnetic space group | structure view + subgroup tree |
 | **RMC monitor state** | Convergence trend, Bragg/PDF & neutron/x-ray conflicts, missing files | — |
 
 ## Install
@@ -101,10 +101,10 @@ from scattering_ai.connectors.rmc_monitor import analyze_monitor   # apps own ze
 report = analyze_monitor(monitor_json)
 ```
 
-**Skills** — validated multi-step workflows the agent invokes as one call
-(`skill_scan_series_transitions`, `skill_characterize_slice`,
-`skill_fit_pattern_peaks`); each returns a summary, `figures`, and an audited
-step chain. See the [Quickstart](QUICKSTART.md#agent-skills).
+**Skills** — validated multi-step workflows the agent invokes as one call,
+organized by category (`series & transitions`, `1D patterns`, `2D slices`,
+`structure`); each returns a summary, `figures`, and an audited step chain.
+See the [Quickstart](QUICKSTART.md#agent-skills).
 
 ## How it works
 

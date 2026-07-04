@@ -170,7 +170,8 @@ def test_analyze_cif_end_to_end(tmp_path):
     assert report.domain == "symmetry"
     assert any("Pm-3m" in o for o in report.observations)
     assert any("maximal subgroup" in o for o in report.observations)
-    assert report.figures and report.figures[0].endswith("subgroup_tree.png")
+    names = {f.rsplit("/", 1)[-1] for f in report.figures}
+    assert {"structure.png", "subgroup_tree.png"} <= names
     assert report.provenance.missing_fields() == []
 
 

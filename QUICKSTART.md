@@ -66,13 +66,14 @@ A **skill** is a validated multi-step workflow the agent runs as one call — it
 chains the right tools in the right order, returns the evidence, a plain-English
 summary, **figures**, and an audited list of every step it took.
 
-Three are built in:
+The built-in skills, grouped by category (see `registry.skills_by_category()`):
 
-| Skill | Answers | Figures |
-|-------|---------|---------|
-| `skill_scan_series_transitions` | Is there a phase transition? Where? | waterfall + peak tracking |
-| `skill_fit_pattern_peaks` | Fit the peaks (with uncertainties) | fit + residual |
-| `skill_characterize_slice` | What's in this 2D slice? | slice map + ring profile |
+| Category | Skill | Answers | Figures |
+|----------|-------|---------|---------|
+| series & transitions | `skill_scan_series_transitions` | Is there a phase transition? Where? | waterfall + peak tracking |
+| 1D patterns | `skill_fit_pattern_peaks` | Fit the peaks (with uncertainties) | fit + residual |
+| 2D slices | `skill_characterize_slice` | What's in this 2D slice? | slice map + ring profile |
+| structure | `skill_visualize_structure` | Show this crystal structure (CIF/mCIF) | unit cell + moments |
 
 Individual tools are called the same way — e.g. crystallographic symmetry from a
 CIF (needs the `symmetry` extra):

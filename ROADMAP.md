@@ -535,8 +535,9 @@ tagged and the repo is pushed. What exists now:
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus/CIF adapters) | all surfaces wrap the same core |
 | D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)** | reports carry figures the LLM reasons over; incomplete-provenance reports are rejected; D5 later |
 
-Built beyond the original slice: 18 agent tools + 3 composite skills, interactive
-chat (Milestone 2, `chat/v3`), plotting toolkit, MCP server (13 tools), a
+Built beyond the original slice: a broad agent-tool registry + composite skills
+organized by category (patterns / series / slices / structure), CIF/mCIF
+structure visualization, interactive chat (Milestone 2), plotting toolkit, MCP server, a
 **robust transition-tracing workflow** (stacked peak selection, auto-detected
 mask sentinel, per-peak monitoring summary — validated on the GaNb4Se8 39 K
 structural transition), and **domain auto-routing** (one entry point picks the
