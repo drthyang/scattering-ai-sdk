@@ -32,7 +32,7 @@ fully offline with local models.
 
 ```bash
 pip install -e ".[dev]"    # development
-pip install -e ".[all]"    # + LLM client, figures (matplotlib), volumes (h5py), API, MCP
+pip install -e ".[all]"    # + LLM client, figures, volumes (h5py), symmetry (spglib), API, MCP
 ```
 
 Python ≥ 3.10. Figures need the `plots` extra (matplotlib); volumes need `volumes`

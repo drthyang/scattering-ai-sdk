@@ -532,7 +532,7 @@ tagged and the repo is pushed. What exists now:
 |-------|------|-------|
 | A — Core Runtime | A0, A1, **A2 (full tool dispatch)** | A3 multi-agent still deferred |
 | B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` technique packs)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` |
-| C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus/CIF adapters) | all surfaces wrap the same core |
+| C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus / CIF / mCIF / RMCProfile `.rmc6f` readers) | all surfaces wrap the same core |
 | D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)** | reports carry figures the LLM reasons over; incomplete-provenance reports are rejected; D5 later |
 
 Built beyond the original slice: a broad agent-tool registry + composite skills
@@ -542,6 +542,13 @@ structure visualization, interactive chat (Milestone 2), plotting toolkit, MCP s
 mask sentinel, per-peak monitoring summary — validated on the GaNb4Se8 39 K
 structural transition), and **domain auto-routing** (one entry point picks the
 pack from the input; `analyze(data={"files":[…]})` with no domain). CI, CHANGELOG.
+
+Also built: **3D-ΔPDF** of a diffuse volume (punch → apodize → centred FFT,
+validated on the real CORELLI volume), **symmetry extras** (systematic
+absences, cell standardization) on top of the space-group/subgroup/pseudosymmetry
+tools, and **RMCProfile file reading** (`.rmc6f` configurations + R-value logs +
+a KDE disorder map). The five domains are `data`, `pdf`, `diffuse`, `symmetry`,
+`rmc`; 196 tests.
 
 Every report now carries **summarizing figures** the LLM reasons over: the
 `data` pack detects a T/field series and reports the **phase transition**

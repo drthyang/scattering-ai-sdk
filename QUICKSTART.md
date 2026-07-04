@@ -15,7 +15,7 @@ Get from install to a figure-backed scientific answer in a few minutes.
 git clone https://github.com/drthyang/scattering-ai-sdk.git
 cd scattering-ai-sdk
 python -m venv .venv && source .venv/bin/activate     # Python >= 3.10
-pip install -e ".[all]"      # everything: figures, LLM client, volumes, API, MCP
+pip install -e ".[all]"      # everything: figures, LLM, volumes, symmetry, API, MCP
 ```
 
 Minimal installs if you don't need everything:
@@ -24,7 +24,8 @@ Minimal installs if you don't need everything:
 |-------|------|------------|
 | `plots` | matplotlib | summarizing figures |
 | `llm` | openai client | LLM interpretation (LM Studio / Ollama / vLLM / OpenAI) |
-| `volumes` | h5py | 3D NeXus volumes (diffuse) |
+| `volumes` | h5py | 3D NeXus volumes (diffuse, 3D-ΔPDF) |
+| `symmetry` | spglib | crystallographic symmetry (CIF/mCIF) |
 | `api` / `mcp` | FastAPI / MCP | HTTP service / MCP server |
 
 Verify:
