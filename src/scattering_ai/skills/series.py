@@ -47,8 +47,6 @@ def scan_series_transitions(
 
     Robust by design: peaks are chosen from the mean over the scan (not one
     curve), and the masked-region sentinel is auto-detected when not given."""
-    import numpy as np
-
     run = SkillRun(registry)
     info = run.call("inspect_series", paths=paths, mask_value=mask_value)
     if "error" in info:
@@ -79,31 +77,35 @@ def scan_series_transitions(
             "plot": tracked.get("plot"),
         })
         for det in (det_c, det_f):
-            if det.get("detected"):
-                detections.append(det["transition_param"])
+            for t in det.get("transitions", []) or []:
+                detections.append(t["param"])
 
     n_tracked = sum(1 for p in per_peak if not p.get("error"))
-    verdict: dict[str, Any] = {"transition_detected": bool(detections)}
-    if detections:
-        verdict.update(
-            transition_estimate=round(float(np.median(detections)), 2),
-            detections_range=[min(detections), max(detections)],
-            n_supporting_trends=len(detections),
-            note="median of changepoints across tracked peaks; confirm against "
-            "the waterfall and tracking plots",
-        )
     params = info.get("params") or []
+    from scattering_ai.tools.series import cluster_transitions
+
+    clusters = cluster_transitions(detections, params)
+    verdict: dict[str, Any] = {"transition_detected": bool(clusters)}
+    if clusters:
+        verdict.update(
+            transitions=clusters,
+            transition_estimate=clusters[0]["param"],  # best-supported cluster
+            n_supporting_trends=len(detections),
+            note="changepoints clustered across tracked peaks — each cluster is "
+            "a candidate transition; a material can have several. Confirm "
+            "against the waterfall and tracking plots.",
+        )
     span = f"{min(params):g}–{max(params):g}" if params else "?"
     if not per_peak:
         summary = "No trackable peaks found in the series."
-    elif detections:
+    elif clusters:
+        listed = "; ".join(f"~{c['param']:g} ({c['n_supporting']} trend(s))"
+                           for c in clusters)
         summary = (
             f"Tracked {n_tracked} peak(s) across {len(params)} curves "
-            f"({info.get('param_label', 'param')} {span}). "
-            f"{len(detections)} trend(s) show a changepoint near "
-            f"{verdict['transition_estimate']:g} "
-            f"(range {min(detections):g}–{max(detections):g}); likely a "
-            "transition. Confirm against the waterfall and tracking plots."
+            f"({info.get('param_label', 'param')} {span}). Candidate "
+            f"transition(s): {listed}. Confirm against the waterfall and "
+            "tracking plots."
         )
     else:
         summary = (

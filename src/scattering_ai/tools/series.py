@@ -200,18 +200,21 @@ def track_peak(
     }
 
 
-def detect_transition(
+def detect_transitions(
     params: list[float],
     values: list[float],
     errors: list[float] | None = None,
 ) -> dict[str, Any]:
-    """Two-segment changepoint detection on a tracked quantity.
+    """Piecewise-linear changepoint detection on a tracked quantity, allowing
+    up to TWO changepoints.
 
-    Fits a straight line to each side of every candidate split and compares
-    the best two-segment residual against the single-line fit. Returns the
-    candidate transition, its improvement ratio, and a significance flag
-    (improvement > 3x beats a smooth trend). Deterministic and crude by
-    design — a candidate generator for interpretation, not a verdict.
+    A material can have more than one transition in a scan (e.g. structural at
+    50 K and magnetic at 29 K); a single-changepoint model forced onto such data
+    lands *between* the true transitions. This fits 1-, 2-, and 3-segment
+    models: the two-segment split must beat one line by >3x, and a three-segment
+    model is accepted only when it beats the best two-segment fit by >2x (each
+    segment >= 3 points). Deterministic and crude by design — a candidate
+    generator for interpretation, not a verdict.
     """
     x = np.asarray(params, dtype=float)
     y = np.asarray(values, dtype=float)
@@ -223,7 +226,8 @@ def detect_transition(
         w = np.ones_like(x)
     n = x.size
     if n < 6:
-        return {"detected": False, "reason": f"only {n} valid points (need >= 6)"}
+        return {"detected": False, "transitions": [],
+                "reason": f"only {n} valid points (need >= 6)"}
 
     def wrss(xs, ys, ws) -> float:
         coeffs = np.polyfit(xs, ys, 1, w=ws)
@@ -234,23 +238,75 @@ def detect_transition(
     # transition to find (guards the 0/0 ratio on noiseless linear data).
     scale = float(np.sum((w * (y - y.mean())) ** 2))
     if single <= 1e-12 * max(scale, 1e-300):
-        return {"detected": False, "reason": "single line fits at numerical precision",
-                "n_points": int(n)}
+        return {"detected": False, "transitions": [], "n_points": int(n),
+                "reason": "single line fits at numerical precision"}
 
-    best_split, best_rss = None, np.inf
-    for i in range(3, n - 2):  # at least 3 points per segment
-        rss = wrss(x[:i], y[:i], w[:i]) + wrss(x[i:], y[i:], w[i:])
-        if rss < best_rss:
-            best_split, best_rss = i, rss
+    def midpoint(i: int) -> float:
+        return round(float((x[i - 1] + x[i]) / 2), 3)
 
-    improvement = single / max(best_rss, 1e-300)
-    t_c = float((x[best_split - 1] + x[best_split]) / 2)
+    best1 = min(((wrss(x[:i], y[:i], w[:i]) + wrss(x[i:], y[i:], w[i:]), i)
+                 for i in range(3, n - 2)), key=lambda t: t[0])
+    r1 = single / max(best1[0], 1e-300)
+
+    best2 = None
+    if n >= 9:
+        best2 = min(((wrss(x[:i], y[:i], w[:i]) + wrss(x[i:j], y[i:j], w[i:j])
+                      + wrss(x[j:], y[j:], w[j:]), i, j)
+                     for i in range(3, n - 5) for j in range(i + 3, n - 2)),
+                    key=lambda t: t[0])
+    r2 = best1[0] / max(best2[0], 1e-300) if best2 else 0.0
+
+    transitions: list[dict[str, Any]] = []
+    if r1 > 3.0:
+        if best2 is not None and r2 > 2.0:
+            transitions = [
+                {"param": midpoint(best2[1]), "improvement_ratio": round(r1 * r2, 2)},
+                {"param": midpoint(best2[2]), "improvement_ratio": round(r1 * r2, 2)},
+            ]
+        else:
+            transitions = [{"param": midpoint(best1[1]),
+                            "improvement_ratio": round(r1, 2)}]
     return {
-        "detected": bool(improvement > 3.0),
-        "transition_param": round(t_c, 3),
-        "improvement_ratio": round(float(improvement), 2),
-        "single_segment_wrss": round(single, 4),
-        "two_segment_wrss": round(float(best_rss), 4),
+        "detected": bool(transitions),
+        "transitions": transitions,
+        "transition_param": transitions[0]["param"] if transitions else None,
+        "improvement_ratio": round(float(r1), 2),
         "n_points": int(n),
-        "note": "changepoint candidate; confirm against the raw curves",
+        "note": "changepoint candidate(s); confirm against the raw curves",
     }
+
+
+def detect_transition(
+    params: list[float],
+    values: list[float],
+    errors: list[float] | None = None,
+) -> dict[str, Any]:
+    """Backward-compatible single-changepoint view of ``detect_transitions``:
+    same keys as before, with the strongest changepoint as ``transition_param``."""
+    return detect_transitions(params, values, errors)
+
+
+def cluster_transitions(candidates: list[float], params: list[float]) -> list[dict[str, Any]]:
+    """Group changepoint candidates from many trends into distinct transitions.
+
+    Detections from different peaks/observables scatter around each true
+    transition; taking one median across ALL of them merges distinct
+    transitions into a fictitious average (the failure mode this replaces).
+    Candidates closer than ~1.5 parameter steps are grouped; each cluster is
+    reported with its median and support count.
+    """
+    if not candidates:
+        return []
+    step = float(np.median(np.diff(sorted(set(params))))) if len(params) > 1 else 1.0
+    ordered = sorted(candidates)
+    clusters: list[list[float]] = [[ordered[0]]]
+    for value in ordered[1:]:
+        if value - clusters[-1][-1] <= 1.5 * step:
+            clusters[-1].append(value)
+        else:
+            clusters.append([value])
+    return sorted(
+        ({"param": round(float(np.median(c)), 2), "n_supporting": len(c),
+          "spread": [min(c), max(c)]} for c in clusters),
+        key=lambda c: -c["n_supporting"],
+    )

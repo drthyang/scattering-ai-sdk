@@ -65,11 +65,10 @@ def _series_figures(series, tracked_all, workspace) -> list[str]:
 def _series_transition(files: list[str], workspace) -> list[Finding]:
     if not _is_series(files):
         return []
-    import numpy as np
-
     from scattering_ai.tools.curves import find_peaks
     from scattering_ai.tools.series import (
-        detect_transition,
+        cluster_transitions,
+        detect_transitions,
         load_series,
         stack_series,
         track_peak,
@@ -99,25 +98,29 @@ def _series_transition(files: list[str], workspace) -> list[Finding]:
             if len(good) < 6:
                 continue
             params = [r["param"] for r in good]
-            det_c = detect_transition(params, [r["center"] for r in good],
-                                      [r["center_err"] for r in good])
-            det_f = detect_transition(params, [r["fwhm"] for r in good],
-                                      [r["fwhm_err"] for r in good])
+            det_c = detect_transitions(params, [r["center"] for r in good],
+                                       [r["center_err"] for r in good])
+            det_f = detect_transitions(params, [r["fwhm"] for r in good],
+                                       [r["fwhm_err"] for r in good])
             tracked_all.append((pk["x"], tracked, det_c, det_f))
-            detections += [d["transition_param"] for d in (det_c, det_f) if d.get("detected")]
+            for det in (det_c, det_f):
+                detections += [t["param"] for t in det.get("transitions", [])]
     except Exception:
         return findings  # keep the series_detected finding; skip the scan
 
     figures = _series_figures(series, tracked_all, workspace)
-    if detections:
-        t_c = round(float(np.median(detections)), 2)
+    clusters = cluster_transitions(detections, series.params)
+    if clusters:
+        listed = "; ".join(f"{label} ≈ {c['param']:g} ({c['n_supporting']} trend(s))"
+                           for c in clusters)
         findings.append(Finding(
             diagnostic="phase_transition", severity=Severity.WARNING,
-            message=f"Phase transition near {label} = {t_c} — {len(detections)} "
-            f"peak trend(s) show a changepoint (range {min(detections):g}–"
-            f"{max(detections):g}). Confirm against the figures.",
-            evidence={"transition_param": t_c, "n_supporting_trends": len(detections),
-                      "detections_range": [min(detections), max(detections)],
+            message=f"Candidate phase transition(s): {listed}. A material can "
+            "have several transitions — each cluster is a distinct candidate. "
+            "Confirm against the figures.",
+            evidence={"transitions": clusters,
+                      "transition_param": clusters[0]["param"],
+                      "n_supporting_trends": len(detections),
                       "n_peaks_tracked": len(tracked_all), "figures": figures},
         ))
     else:

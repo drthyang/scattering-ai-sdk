@@ -38,7 +38,7 @@ def test_series_produces_transition_and_figures(tmp_path):
         AnalysisRequest(question="Is there a transition?", data={"files": _series(tmp_path)}))
     assert report.domain == "data"
     # a phase-transition observation with a plausible T_c
-    hit = [o for o in report.observations if "Phase transition" in o]
+    hit = [o for o in report.observations if "phase transition" in o.lower()]
     assert hit and "K" in hit[0]
     # waterfall + tracking figures generated and on disk
     names = {Path(f).name for f in report.figures}

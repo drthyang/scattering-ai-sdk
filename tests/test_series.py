@@ -107,6 +107,29 @@ def test_stack_series_picks_persistent_peaks(tmp_path):
     assert not spike or spike[0]["prominence"] < top["prominence"] / 5
 
 
+def test_detect_two_transitions():
+    """Two kinks (e.g. structural at 50 K + magnetic at 29 K) must be found as
+    TWO transitions, not one averaged changepoint between them."""
+    from scattering_ai.tools.series import cluster_transitions, detect_transitions
+
+    temps = list(np.arange(5, 100, 5.0))
+    values = []
+    for t in temps:  # piecewise-linear with kinks at 29 and 50
+        v = 5.0 + 0.0002 * t
+        if t > 29:
+            v += 0.004 * (t - 29)
+        if t > 50:
+            v -= 0.007 * (t - 50)
+        values.append(v + RNG.normal(0, 1e-4))
+    det = detect_transitions(temps, values)
+    assert det["detected"] and len(det["transitions"]) == 2
+    found = sorted(t["param"] for t in det["transitions"])
+    assert abs(found[0] - 29) <= 5 and abs(found[1] - 50) <= 5
+    # clustering keeps them distinct
+    clusters = cluster_transitions(found, temps)
+    assert len(clusters) == 2
+
+
 def test_no_transition_on_smooth_trend():
     temps = list(np.arange(5, 100, 5.0))
     values = [1.0 + 0.001 * t for t in temps]  # perfectly linear
@@ -122,16 +145,17 @@ def test_detect_transition_needs_enough_points():
 
 @pytest.mark.skipif(len(REAL) < 10, reason="GaNb4Se8 series not present")
 def test_real_ganb4se8_transition():
-    """Known answer: GaNb4Se8 structural transition in the 30-55 K range.
+    """Known answer (user ground truth): GaNb4Se8 has transitions at ~50 K and
+    ~29 K. The strong Bragg-peak center trends must yield a changepoint cluster
+    bracketing 50 K; detections must NOT be collapsed into one fictitious
+    average (the old single-median behaviour reported "39 K")."""
+    from scattering_ai.tools.series import cluster_transitions
 
-    Peak-center trends (lattice expansion anomaly) must show a changepoint
-    there for the strong Bragg peaks.
-    """
     series = load_series([str(p) for p in REAL], mask_value=-3.0)
     assert len(series.curves) == 20
     assert series.params[0] == 5.0 and series.params[-1] == 99.1
 
-    detections = []
+    candidates = []
     for center in (3.666, 4.494, 4.764, 5.186):
         tracked = track_peak(series, center=center, fwhm_guess=0.03)
         good = [r for r in tracked["rows"] if r.get("ok")]
@@ -141,7 +165,10 @@ def test_real_ganb4se8_transition():
             [r["center"] for r in good],
             [r["center_err"] for r in good],
         )
-        detections.append(det)
+        candidates += [t["param"] for t in det.get("transitions", [])]
 
-    found = [d for d in detections if d["detected"] and 30 <= d["transition_param"] <= 55]
-    assert len(found) >= 3
+    assert candidates
+    clusters = cluster_transitions(candidates, series.params)
+    # the ~50 K structural transition must appear as its own cluster
+    # (data steps are ~5 K: the 49.1/54.3 bracket)
+    assert any(45 <= c["param"] <= 57 for c in clusters)
