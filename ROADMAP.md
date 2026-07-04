@@ -576,21 +576,46 @@ the standard windowed-FFT method; nebula3d is AGPL so its source was not copied)
 RMCProfile readers + KDE density map (adapted from the MIT rmc-toolkits). Symmetry
 gained systematic absences + cell standardization.
 
+Community survey (2026-07, see "Community-informed candidates" below): the
+highest-impact gaps versus what the field's standard tools do are PDF
+**model fitting** (PDFgui/TOPAS territory), **structure-database lookup**
+(what agentic tools like guillemot do via OPTIMADE), and **mPDF** (diffpy.mpdf) —
+the last is a short step since the SDK already parses mCIF moments.
+
 ```text
-Next:
-1.  B4 — `ins` pack (inelastic neutron scattering, incl. phonons per D12):
-    diagnostics on S(Q,ω) / dispersion / DOS data once such data lands in data/
-    (acceptance = known answer). Deferred until example data exists — this is
-    also the home for rmc-phonon's reciprocal-space / k-path utilities.
-2.  Symmetry, when representation-theory tables are available: klassengleiche
-    subgroups, irrep / symmetry-mode decomposition, k-vector → maximal magnetic
-    space groups (MAXMAGN).
-3.  D5 groundwork — assemble reproducible case-study runs the packs now enable
-    (phase transition, inverted-.gr, diffuse contaminant/anisotropy, RMC
-    convergence) for the publication evidence base.
-4.  Chat polish: surface figures inline; optional streaming.
-5.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
+Next (impact-ordered):
+1.  PDF model comparison: simulate G(r) from a CIF (pair sums + Debye-Waller)
+    and compare/fit against a measured G(r) — the single most-used PDF
+    workflow in the community; turns the pdf pack from QC into analysis.
+2.  OPTIMADE structure lookup tool: query the federated crystal-structure
+    databases (COD/MP/OQMD/...) by composition/cell to identify candidate
+    phases for an observed pattern — cheap REST integration, large agent value.
+3.  mPDF: ideal magnetic PDF from an mCIF spin structure (we already read
+    moments); compare against measured neutron G(r) residues.
+4.  B4 — `ins` pack (inelastic neutron scattering, incl. phonons per D12),
+    once example S(Q,ω) data lands in data/ — also the home for rmc-phonon's
+    reciprocal-space / k-path utilities.
+5.  Symmetry, when representation-theory tables are available: klassengleiche
+    subgroups, irrep / symmetry-mode decomposition, k-vector → maximal
+    magnetic space groups (MAXMAGN).
+6.  D5 groundwork — reproducible case-study runs (phase transition,
+    inverted-.gr, diffuse contaminant/anisotropy, RMC convergence).
+7.  Chat polish: surface figures inline; optional streaming.
+8.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
+
+### Community-informed candidates (survey, 2026-07)
+
+What the field's standard tools do that the SDK does not yet, impact-ordered:
+
+| Capability | Community reference | Why it matters here |
+|------------|--------------------|---------------------|
+| PDF structure-model fitting | PDFgui / diffpy-CMI, TOPAS | The core PDF workflow; SDK currently detects/QCs but cannot say "this model fits" |
+| Structure DB lookup (OPTIMADE) | guillemot agent; COD/MP/OQMD | Identify candidate phases from cell/composition — a natural agent tool |
+| Magnetic PDF (mPDF) | diffpy.mpdf | SDK already parses mCIF moments; short path to local-magnetism analysis |
+| 3D-ΔPDF *modeling/refinement* | Yell (Simonov & Weber) | We compute the forward ΔPDF; refining disorder models against it is the long-term prize |
+| Reciprocal-space symmetry averaging | Meerkat | Improves diffuse volumes before ΔPDF; incremental |
+| Governed end-to-end reduction→CIF | NeuDiff Agent (SNS TOPAZ) | Validates the SDK's provenance-first design; aim reports at "publication-ready" quality |
 
 Rule still holds: every deterministic check must reproduce a known answer on
 real data in `data/` before the agent is allowed to rely on it.

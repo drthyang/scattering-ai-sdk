@@ -19,7 +19,12 @@ _SKIP_SUFFIXES = {".md", ".png", ".json"}
 def expand_files(entries: list[str]) -> list[str]:
     expanded: list[str] = []
     for entry in entries:
-        if any(ch in entry for ch in "*?["):
+        # An existing literal path always wins over glob interpretation:
+        # real facility filenames contain brackets ("[h,0,0]", "(0,k,l)") that
+        # glob would otherwise read as character classes and match nothing.
+        if Path(entry).is_file():
+            expanded.append(entry)
+        elif any(ch in entry for ch in "*?["):
             expanded += sorted(_glob.glob(entry))
         elif Path(entry).is_dir():
             expanded += sorted(

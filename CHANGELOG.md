@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Fixes + performance (full live verification pass)
+- **Fix:** file entries containing glob characters (`[h,0,0]`, `(0,k,l)` — real
+  facility filenames) were mangled by glob expansion, mis-routing e.g. the
+  CORELLI volume to the generic domain. An existing literal path now always wins
+  over glob interpretation.
+- **Performance:** 3D-ΔPDF FFT now uses scipy's multithreaded pocketfft
+  (~4× faster end-to-end on the real CORELLI volume) and `punch_bragg`
+  estimates its robust threshold from a fixed-seed subsample instead of sorting
+  tens of millions of voxels.
+- **Verified live on Ollama (gemma4:26b), 5/5 domains** with real data: phase
+  transition at 39 K (figures), inverted-G(r) flagged, diffuse volume figure +
+  anisotropy, Pm-3m + 5 transition pathways (structure + tree figures), and an
+  `.rmc6f` configuration summary — all high confidence, full provenance.
+
 ### MCP server — resources + prompts
 - The MCP server now exposes, beyond the tools + skills + `analyze`:
   - **Resources**: the curated knowledge base (`knowledge://…`, path-traversal

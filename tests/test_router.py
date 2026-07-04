@@ -58,6 +58,18 @@ def test_no_input_falls_back_to_data():
     assert detect_domain(_req([]))[0] == "data"
 
 
+def test_expand_files_keeps_bracketed_filenames(tmp_path):
+    """Regression: real facility names contain glob chars ('[h,0,0]', '(0,k,l)');
+    an existing literal path must win over glob interpretation."""
+    from scattering_ai.core.files import expand_files
+
+    p = tmp_path / "TbTi3Bi4_(0,k,l)_[h,0,0]_[-12.0,12.0].nxs"
+    p.write_bytes(b"\x89HDF")
+    assert expand_files([str(p)]) == [str(p)]
+    report_files = _req([str(p)])
+    assert detect_domain(report_files)[0] == "diffuse"
+
+
 def test_analyze_expands_directory_like_the_cli(tmp_path):
     """A directory or glob in files is expanded by the Python API, not only the
     CLI, so analyze(data={'files': [dir]}) runs a whole series."""
