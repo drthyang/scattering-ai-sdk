@@ -85,6 +85,8 @@ class KnowledgeBase:
     def _load(self, subdirs: list[str] | None) -> None:
         roots = [self.root / d for d in subdirs] if subdirs else [self.root]
         for base in roots:
+            if not base.is_dir():
+                continue  # e.g. knowledge/learned/ before any snippet is applied
             for path in sorted(base.rglob("*.md")):
                 rel = str(path.relative_to(self.root))
                 for section, body in _split_sections(path.read_text()):

@@ -615,16 +615,15 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
 - **Goal:** corrections and resolved failures feed the curated knowledge base
   (Tier-0 snippet proposals), so retrieved knowledge improves with use — the
   RAG layer learns the researcher's real gotchas, cited and reviewed.
-- **Done:** a non-routing correction now yields a `knowledge_snippet` proposal
+- **Done:** a non-routing correction yields a `knowledge_snippet` proposal
   (Tier-0) alongside its regression eval; `learn apply` writes a cited
   `knowledge/learned/<domain>__<key>.md` (statement + corrected value + source
   episodes) through the eval gate. Routing corrections don't (a mis-route isn't
-  domain knowledge).
-- **Remaining:** re-index `knowledge/learned/` into the retriever so applied
-  snippets are actually retrieved (currently written + cited; retrieval wiring
-  is the follow-up).
-- **DoD:** an accepted correction lands (human-approved) as a cited knowledge
-  snippet; retrieval of it is the remaining wiring.
+  domain knowledge). **Retrieval is wired**: every pack's scope now includes
+  `knowledge/learned/`, so an applied snippet is retrieved and cited by later
+  related questions — the RAG layer learns the researcher's gotchas end-to-end.
+- **DoD ✅:** an accepted correction lands (human-approved) as a cited knowledge
+  snippet that a later related question retrieves.
 
 ---
 
@@ -690,7 +689,7 @@ has begun improving through its own use. What exists now:
 | B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` packs; PDF model fitting, OPTIMADE lookup, mPDF, magnetic-diffuse tools)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` (data-gated, E8) |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus / CIF / mCIF / RMCProfile `.rmc6f` readers) | all surfaces wrap the same core |
 | D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)**, **D6 started (symlink-escape fix)** | incomplete-provenance reports rejected; adversarial hardening begun; D5 later |
-| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop), E6 (capture chat + MCP), E7 (agent briefs), E8 (data-gated watch queue), E9 (knowledge growth)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; remaining wiring: E7 one-command hand-off, E9 retrieval, E6 reformulation |
+| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop), E6 (capture chat + MCP), E7 (agent briefs), E8 (data-gated watch queue), E9 (knowledge growth)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; remaining wiring: E7 one-command hand-off, E6 reformulation |
 
 Built beyond the original slice: a broad agent-tool registry + composite skills
 organized by category (patterns / series / slices / structure), CIF/mCIF
@@ -724,7 +723,7 @@ redacted journal, deterministic signals + human corrections, tiered proposals,
 and a guarded apply with an eval gate — plus its first adversarial fix (D6,
 symlink escape, from a Codex-delegated review). Track E completed E6–E9
 (capture chat + MCP failures, agent briefs, data-gated watch queue, knowledge
-growth) and D5's case-study harness landed. **277 tests.**
+growth) and D5's case-study harness landed. **279 tests.**
 
 ## Immediate Next Actions
 
@@ -766,8 +765,7 @@ Next (impact-ordered):
     (S(Q,ω) / phonons per D12) and T3 Spinvert spin refinement — drop the data
     in data/, run `learn watch --brief`, hand the brief to a coding agent.
 2.  Close the E-track wiring: E7 one-command agent hand-off (launch Codex/Claude
-    Code on the branch), E9 retrieval of applied knowledge/learned/ snippets,
-    E6 cross-turn "repeated reformulation" detection.
+    Code on the branch), and E6 cross-turn "repeated reformulation" detection.
 3.  Symmetry rep-theory (klassengleiche subgroups, irrep/mode decomposition,
     MAXMAGN) — gated on representation-theory tables.
 4.  Chat polish: surface figures inline; optional streaming.

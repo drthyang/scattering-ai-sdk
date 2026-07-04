@@ -147,8 +147,10 @@ inferred: `record_correction(episode, target, statement, corrected_value)` (API
   data-gated builds are unblocked and, with `--brief`, emits an E7 brief for each.
 - **E9 — Knowledge growth (DONE):** a non-routing correction also yields a
   `knowledge_snippet` proposal (Tier-0); `learn apply` writes a cited
-  `knowledge/learned/<domain>__<key>.md` through the eval gate. Remaining wiring:
-  re-index `knowledge/learned/` into the retriever so applied snippets are served.
+  `knowledge/learned/<domain>__<key>.md` through the eval gate, and the retriever
+  now **serves it** — every pack's retrieval scope includes `knowledge/learned/`,
+  so an applied correction is retrieved and cited by later related questions.
+  The RAG layer learns the researcher's gotchas, closed end-to-end.
 - **D6 — Adversarial robustness (STARTED):** the tier denylist/allowlist resist
   `..` traversal and **symlink** escapes — every filesystem touch refuses to
   traverse a symlink (`test_tier0_symlink_target_cannot_escape_into_source`),

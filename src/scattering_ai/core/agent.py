@@ -239,7 +239,11 @@ class Agent:
     def _retrieve(self, request: AnalysisRequest, pack: DomainPack) -> list[RetrievedChunk]:
         if not request.options.use_rag or self.knowledge_root is None:
             return []
-        kb = KnowledgeBase(self.knowledge_root, subdirs=pack.knowledge_dirs or None)
+        # Always include knowledge/learned/ — the growth loop (E9) writes cited
+        # snippets there from human corrections, so applied knowledge is served.
+        # A pack that scans the whole root already covers it.
+        subdirs = list(pack.knowledge_dirs) + ["learned"] if pack.knowledge_dirs else None
+        kb = KnowledgeBase(self.knowledge_root, subdirs=subdirs)
         return kb.retrieve(request.question, k=4)
 
     def _deterministic_summary(self, findings: list[Finding]) -> str:

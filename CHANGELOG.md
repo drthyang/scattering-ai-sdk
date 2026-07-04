@@ -50,7 +50,9 @@ gates), not by policy. Full design in
   `learn watch [--brief]` flags which builds are unblocked by newly-arrived data.
 - **Knowledge growth (E9):** a non-routing correction also proposes a
   `knowledge_snippet` (Tier-0); applying it writes a cited
-  `knowledge/learned/<domain>__<key>.md` through the eval gate.
+  `knowledge/learned/<domain>__<key>.md` through the eval gate, and the retriever
+  serves it — every pack's retrieval scope now includes `knowledge/learned/`, so
+  an applied correction is retrieved and cited by later related questions.
 - **Case-study harness (D5, `evaluation/case_studies.py`):** `scattering-ai
   case-studies` runs known-answer cases — two on committed RMC demo data, three
   on local facility data (inverted `.gr`, GaNb4Se8 transition, CORELLI
