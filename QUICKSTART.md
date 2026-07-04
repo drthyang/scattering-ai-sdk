@@ -77,6 +77,7 @@ The built-in skills, grouped by category (see `registry.skills_by_category()`):
 | structure | `skill_visualize_structure` | Show this crystal structure (CIF/mCIF) | unit cell + moments |
 | structure | `skill_symmetry_overview` | Space group + subgroups + transitions | subgroup tree |
 | 3D volumes | `skill_delta_pdf` | 3D-ΔPDF + real-space correlations | central-plane ΔPDF |
+| magnetic | `skill_magnetic_diffuse` | mPDF + spin correlations + magnetic I(Q) | mPDF + I(Q) |
 
 Individual tools are called the same way — e.g. crystallographic symmetry from a
 CIF (needs the `symmetry` extra):

@@ -628,17 +628,16 @@ Tools (deterministic):
 T1. spin_correlations (built 2026-07): ⟨S_i·S_j⟩ per neighbour shell from an
     ordered/disordered spin configuration (mCIF moments or arrays) — the
     real-space fingerprint spinvert produces from its refined configurations.
-T2. powder magnetic diffuse I(Q) from a spin configuration (Blech–Averbach
-    powder average; Scatty's core in simplified form). Needs magnetic form
-    factors (tabulated dipole ⟨j0⟩ coefficients) for quantitative use.
+T2. powder magnetic diffuse I(Q) (built 2026-07): Blech–Averbach spherical
+    average + ⟨j0⟩ form-factor table; verified vs brute-force to <1%.
 T3. Spinvert-style RMC spin refinement (fit a spin configuration to measured
     magnetic diffuse I(Q)): a real optimizer loop — substantial; only with
     reference data to validate against.
 T4. Spinteract-style interaction refinement (J's from diffuse data via
     Onsager reaction-field theory): the physics prize; long-term.
 
-Agent skills (once T2 exists):
-S1. skill_magnetic_diffuse: mCIF/spin config → mPDF + spin correlations +
+Agent skills:
+S1. skill_magnetic_diffuse (built 2026-07): mCIF → mPDF + spin correlations +
     powder I(Q) in one call, with figures.
 S2. skill_frustration_check: shell correlations vs a k-vector's ideal pattern
     (flags geometric frustration signatures).

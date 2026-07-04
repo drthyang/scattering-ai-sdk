@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Powder magnetic I(Q) + skill_magnetic_diffuse
+- **`powder_magnetic_iq_from_mcif`**: powder-averaged magnetic diffuse
+  scattering I(Q) from a spin structure — the Blech–Averbach spherical average
+  `(2/3)S_i·S_j j0(Qr) + (1/3)(3(S_i·r̂)(S_j·r̂)−S_i·S_j) j2(Qr)` with a `<j0>`
+  magnetic form-factor table (ion inferred from the species). Non-negative by
+  construction; verified against a brute-force direction average to <1%. The
+  forward calculation at the heart of Scatty/spinvert.
+- **`skill_magnetic_diffuse`** (new `magnetic` skill category): mPDF +
+  spin-pair correlations + powder I(Q) of a magnetic structure in one call,
+  with figures. Correctly labels AFM vs FM nearest-neighbour correlations.
+
 ### Structure lookup, magnetic PDF, spin correlations, punch-and-fill
 - **`lookup_structures`** (OPTIMADE): query the open crystal-structure
   databases (default COD) by elements/formula to identify candidate phases —

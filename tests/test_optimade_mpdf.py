@@ -120,3 +120,61 @@ def test_spin_correlations_shells():
     assert shells[4.0]["correlation"] == 1.0        # same sublattice: FM
     assert shells[6.63]["correlation"] == -1.0
     assert shells[6.63]["multiplicity"] == 24.0     # why it dominates the mPDF
+
+
+def test_powder_magnetic_iq_nonnegative_and_fm_vs_afm():
+    from scattering_ai.tools.mpdf import powder_magnetic_iq
+
+    afm = powder_magnetic_iq(spins=[[0, 0, 3], [0, 0, -3]], qmin=0.05, qmax=5, **CSCL)
+    fm = powder_magnetic_iq(spins=[[0, 0, 3], [0, 0, 3]], qmin=0.05, qmax=5, **CSCL)
+    # |M_perp|^2 average is non-negative by construction (validates the formula)
+    assert (afm["i"] >= -1e-9).all() and (fm["i"] >= -1e-9).all()
+    low = afm["q"] < 0.6
+    assert fm["i"][low].sum() > 3 * afm["i"][low].sum()  # FM forward scattering
+
+
+def test_magnetic_form_factor_decays():
+    from scattering_ai.tools.mpdf import magnetic_form_factor
+
+    assert abs(magnetic_form_factor(np.array([0.0]), "Mn2")[0] - 1.0) < 0.01
+    assert magnetic_form_factor(np.array([8.0]), "Mn2")[0] < 0.5
+    # unknown ion -> point dipole (flat 1.0)
+    assert magnetic_form_factor(np.array([5.0]), "Xx")[0] == 1.0
+
+
+def test_skill_magnetic_diffuse(tmp_path):
+    pytest.importorskip("matplotlib")
+    from scattering_ai.tools.registry import default_toolkit
+
+    mcif = tmp_path / "afm.mcif"
+    mcif.write_text("""data_MnAFM
+_cell_length_a 4.0
+_cell_length_b 4.0
+_cell_length_c 4.0
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Mn1 Mn 0.0 0.0 0.0
+Mn2 Mn 0.5 0.5 0.5
+loop_
+_atom_site_moment.label
+_atom_site_moment.crystalaxis_x
+_atom_site_moment.crystalaxis_y
+_atom_site_moment.crystalaxis_z
+Mn1 0.0 0.0 4.0
+Mn2 0.0 0.0 -4.0
+""")
+    reg = default_toolkit(tmp_path / "ws")
+    out = reg.execute("skill_magnetic_diffuse", {"path": str(mcif)})
+    assert out["step_errors"] == 0
+    assert "antiferromagnetic" in out["summary"]
+    assert out["form_factor"] == "<j0> Mn2"
+    assert len([f for f in out["figures"] if f.endswith(".png")]) == 2
+    cats = reg.skills_by_category()
+    assert cats["magnetic"] == ["skill_magnetic_diffuse"]

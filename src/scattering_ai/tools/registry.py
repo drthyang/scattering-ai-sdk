@@ -479,10 +479,50 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                    header="r  mPDF f(r) (ideal, arbitrary scale)")
         i_min = int(np.argmin(sim["f"]))
         i_max = int(np.argmax(sim["f"]))
-        return {"saved": str(out_path), "n_magnetic": sim["n_magnetic"],
-                "strongest_afm_distance": round(float(sim["r"][i_min]), 3),
-                "strongest_fm_distance": round(float(sim["r"][i_max]), 3),
-                "note": sim["note"]}
+        result = {"saved": str(out_path), "n_magnetic": sim["n_magnetic"],
+                  "strongest_afm_distance": round(float(sim["r"][i_min]), 3),
+                  "strongest_fm_distance": round(float(sim["r"][i_max]), 3),
+                  "note": sim["note"]}
+        try:
+            from scattering_ai.tools.models import Curve1D
+            from scattering_ai.tools.plotting import plot_curve
+
+            curve = Curve1D(x=sim["r"], y=sim["f"], xlabel="r (Å)", ylabel="mPDF f(r)")
+            result["plot"] = plot_curve(curve, artifact("mpdf", ".png"))
+        except ImportError:
+            pass
+        return result
+
+    def powder_magnetic_iq_from_mcif(path: str, qmax: float = 6.0,
+                                     ion: str = "") -> dict:
+        from scattering_ai.tools.cif import read_structure
+        from scattering_ai.tools.mpdf import powder_magnetic_iq
+
+        s = read_structure(path)
+        if not s.get("moments"):
+            return {"error": f"{path} has no magnetic moments (_atom_site_moment loop)"}
+        out = powder_magnetic_iq(s["lattice"], s["positions"], s["moments"],
+                                 qmax=qmax, ion=ion or None, species=s["species"])
+        if "error" in out:
+            return out
+        saved = artifact("magnetic_iq", ".dat")
+        np.savetxt(saved, np.column_stack([out["q"], out["i"]]),
+                   header="Q  I(Q) magnetic (arbitrary scale)")
+        i_peak = int(np.argmax(out["i"]))
+        result = {"saved": str(saved), "n_magnetic": out["n_magnetic"],
+                  "form_factor": out["form_factor"],
+                  "strongest_peak_q": round(float(out["q"][i_peak]), 3),
+                  "note": out["note"]}
+        try:
+            from scattering_ai.tools.models import Curve1D
+            from scattering_ai.tools.plotting import plot_curve
+
+            curve = Curve1D(x=out["q"], y=out["i"], xlabel="Q (1/Å)",
+                            ylabel="I(Q) magnetic")
+            result["plot"] = plot_curve(curve, artifact("magnetic_iq", ".png"))
+        except ImportError:
+            pass
+        return result
 
     def spin_correlations_from_mcif(path: str, rmax: float = 12.0) -> dict:
         from scattering_ai.tools.cif import read_structure
@@ -852,6 +892,16 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "is diffpy.mpdf territory.",
                 _params({"path": string, "rmax": number, "sigma": number}, ["path"]),
                 simulate_mpdf_from_mcif,
+            ),
+            AgentTool(
+                "powder_magnetic_iq_from_mcif",
+                "Powder-averaged magnetic diffuse scattering I(Q) from a magnetic "
+                "structure (mCIF): Blech–Averbach spherical average with the <j0> "
+                "magnetic form factor (ion inferred from the species, or pass ion "
+                "e.g. 'Mn2'). Non-negative; ordered structures give broadened "
+                "magnetic Bragg peaks. Saves the curve + plot.",
+                _params({"path": string, "qmax": number, "ion": string}, ["path"]),
+                powder_magnetic_iq_from_mcif,
             ),
             AgentTool(
                 "spin_correlations_from_mcif",

@@ -124,8 +124,8 @@ The host then gets, all from the same tested core:
 
 **Skills** — validated multi-step workflows the agent invokes as one call,
 organized by category (`series & transitions`, `1D patterns`, `2D slices`,
-`structure`, `3D volumes`); each returns a summary, `figures`, and an audited
-step chain. See the [Quickstart](QUICKSTART.md#agent-skills).
+`structure`, `3D volumes`, `magnetic`); each returns a summary, `figures`, and
+an audited step chain. See the [Quickstart](QUICKSTART.md#agent-skills).
 
 ## How it works
 
