@@ -136,7 +136,7 @@ def test_tool_provenance_invariant(tmp_path):
                 )
             return LLMResponse(content=json.dumps({"summary": "s", "confidence": "low"}))
 
-    report = Agent(llm=OneToolLLM(), workspace=tmp_path / "ws").analyze(
+    report = Agent(llm=OneToolLLM(), model_id="scripted", workspace=tmp_path / "ws").analyze(
         AnalysisRequest(domain="data", question="?", data={"files": [str(curve)]})
     )
     assert report.used_tools == ["inspect_curve"]

@@ -102,10 +102,29 @@ def _pdf_pack() -> DomainPack:
     )
 
 
+def _diffuse_pack() -> DomainPack:
+    from scattering_ai.domains.diffuse import prompts
+    from scattering_ai.domains.diffuse.diagnostics import NEXT_CHECK_RULES, run_all
+
+    def run(request: AnalysisRequest) -> list[Finding]:
+        return run_all(request.data.files)
+
+    return DomainPack(
+        name="diffuse",
+        description="Single-crystal diffuse scattering / 3D-ΔPDF (volumes and slices)",
+        run_diagnostics=run,
+        knowledge_dirs=["scattering"],
+        prompt_version=prompts.PROMPT_VERSION,
+        system_prompt=prompts.SYSTEM_PROMPT,
+        next_check_rules=NEXT_CHECK_RULES,
+    )
+
+
 _BUILTIN: dict[str, Callable[[], DomainPack]] = {
     "rmc": _rmc_pack,
     "data": _data_pack,
     "pdf": _pdf_pack,
+    "diffuse": _diffuse_pack,
 }
 
 

@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Provenance enforcement (D4)
+- Reports with an incomplete provenance block are now **rejected by output
+  validation** (`ReportValidationError`), not silently returned. `sdk_version`,
+  `schema_version`, `input_hash` (sha256), and `timestamp` are always required;
+  `model` and `prompt_version` become required once an LLM contributes
+  interpretation. `Provenance.missing_fields()` / `AnalysisReport.assert_valid()`
+  expose the check. When an LLM runs without an explicit `model_id`, the client
+  class name is recorded so the report stays attributable (never fabricated).
+
+### Diffuse-scattering domain pack (B4 — second technique pack)
+- New `diffuse` domain: `analyze(domain="diffuse", ...)`. Deterministic,
+  cheap diagnostics that route by file type:
+  - **Volume (.nxs):** axis ranges / lattice and **anisotropic-sampling**
+    detection (broadening along a coarsely-sampled axis is resolution, not the
+    sample) — from metadata only, no full-array read.
+  - **2D slice (.npz):** Bragg-punch / mask **coverage**, **contaminant powder
+    rings** (Al/Cu/steel/V) as sample-environment artifacts, and Bragg-vs-diffuse
+    character (sharp-peak count).
+  - Versioned prompt `diffuse_interpret/v1` + a diffuse/3D-ΔPDF knowledge file.
+    Validated on the real CORELLI TbTi3Bi4 volume (4.5× anisotropy, Cu ring).
+
 ### PDF / total-scattering domain pack (B4 — first technique pack)
 - New `pdf` domain: `analyze(domain="pdf", ...)` / `scattering-ai analyze
   --domain pdf`. Deterministic diagnostics on G(r)/S(Q)/F(Q) files, encoding

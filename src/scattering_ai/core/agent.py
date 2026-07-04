@@ -92,7 +92,16 @@ class Agent:
         )
         next_checks = llm_checks + [c for c in rule_checks if c not in llm_checks]
 
-        return AnalysisReport(
+        # Attribution is mandatory once an LLM contributes (D4). Fall back to the
+        # client class when no model id was supplied, so the report is always
+        # attributable without fabricating a model name.
+        if self.llm is not None:
+            model = self.model_id or type(self.llm).__name__
+            prompt_version = pack.prompt_version
+        else:
+            model = prompt_version = ""
+
+        report = AnalysisReport(
             status="ok",
             summary=summary or self._deterministic_summary(findings),
             observations=observations,
@@ -107,13 +116,14 @@ class Agent:
             provenance=Provenance(
                 sdk_version=scattering_ai.__version__,
                 input_hash=_input_hash(request),
-                model=self.model_id if self.llm else "",
-                prompt_version=pack.prompt_version if self.llm else "",
+                model=model,
+                prompt_version=prompt_version,
                 retrieved_chunks=[r.citation for r in chunks],
                 tool_calls=tool_records,
                 timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             ),
         )
+        return report.assert_valid(requires_model=self.llm is not None)
 
     def _retrieve(self, request: AnalysisRequest, pack: DomainPack) -> list[RetrievedChunk]:
         if not request.options.use_rag or self.knowledge_root is None:

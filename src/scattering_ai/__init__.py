@@ -10,6 +10,7 @@ from scattering_ai.core.schemas import (
     Citation,
     Confidence,
     Provenance,
+    ReportValidationError,
 )
 
 __version__ = "0.1.0"
@@ -23,6 +24,7 @@ __all__ = [
     "Citation",
     "Confidence",
     "Provenance",
+    "ReportValidationError",
     "analyze",
     "__version__",
 ]

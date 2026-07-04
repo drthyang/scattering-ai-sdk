@@ -60,10 +60,12 @@ scattering-ai analyze --file my_pattern.gr \
 scattering-ai analyze --file my_pattern.gr --domain pdf --question "Healthy G(r)?"
 ```
 
-Domains: `rmc` (run health), `pdf` (total scattering / G(r) & S(Q)), and `data`
-(generic tool-driven). Each pack ships its own diagnostics, knowledge, prompt,
-and next-check rules; third parties add packs via the `scattering_ai.domains`
-entry point without touching core.
+Domains: `rmc` (run health), `pdf` (total scattering / G(r) & S(Q)), `diffuse`
+(single-crystal diffuse / 3D-ΔPDF volumes & slices), and `data` (generic
+tool-driven). Each pack ships its own diagnostics, knowledge, prompt, and
+next-check rules; third parties add packs via the `scattering_ai.domains` entry
+point without touching core. Every returned report is fully attributable — the
+SDK rejects reports with incomplete provenance.
 
 Interactive chat — iterative analysis with tools and skills (history and
 artifacts persist across turns; transcript saved for provenance):

@@ -40,6 +40,7 @@ Decisions are recorded here so future contributors see *why*, and so any of them
 | D9 | numpy/scipy in core; h5py optional | Data tools are now the SDK's center, so numeric deps are core; HDF5/NeXus volume support stays an extra (`[volumes]`) for lightweight installs | Accepted (2026-07) |
 | D10 | Domain-owned next-check rules | The deterministic "what to check next" rules for a technique are domain content, not core logic; they live on the `DomainPack`, not in `core/agent.py`. Surfaced while building the first technique pack (B4): keeps the "no core reasoning changes per new pack" invariant honest and testable | Accepted (2026-07) |
 | D11 | First technique pack = PDF / total scattering | Chosen over phonons/diffuse for the first B4 pack because the tools (S(Q)→G(r), peak fitting, series) and validated real data (FeCoSn, GaTa4Se8) already exist, and it directly feeds the RMC workflow. Encodes the user's known real-data gotchas (inverted-.gr sign, NOMAD S(Q)−1 naming) as deterministic diagnostics | Accepted (2026-07) |
+| D12 | Phonons belong to an inelastic-neutron-scattering (INS) domain | Phonon analysis is one capability of INS (S(Q,ω), dispersions, DOS, dynamic structure factor), not a standalone technique. The future pack is `ins` (energy-resolved scattering), with phonon skills inside it — not a `phonons` pack. Keeps the domain axis = measurement technique, consistent with `pdf`/`diffuse` | Accepted (2026-07) |
 
 ---
 
@@ -361,9 +362,17 @@ Track D — Trust & Quality     D1 diagnostics → D2 reports → D3 evaluation 
   - **Qmax / range:** report the termination-ripple driver.
   - Versioned prompt `pdf_interpret/v1`, curated PDF knowledge, eval cases
     pinned to the real FeCoSn / GaTa4Se8 data.
+- **Second pack — diffuse / 3D-ΔPDF (done):** the `diffuse` domain diagnoses
+  reciprocal-space volumes and 2D slices — Bragg-punch/mask coverage,
+  contaminant powder rings (Al/Cu/steel/V), anisotropic sampling, and
+  Bragg-vs-diffuse character; knowledge on diffuse scattering and 3D-ΔPDF.
+  Validated on the real CORELLI TbTi3Bi4 volume (flags its 4.5× anisotropic
+  sampling and a Cu ring candidate).
 - **Later candidate packs (order by user need):**
-  - **Phonons:** explain modes, flat branches, DOS features, spectra comparison, acoustic-mode checks; knowledge on acoustic/optical modes, eigenvectors, INS, soft modes.
-  - **Diffuse / 3D-ΔPDF:** summarize diffuse features, Bragg-punching artifacts, 3D-ΔPDF slice comparison, real-space correlation identification.
+  - **INS (inelastic neutron scattering, incl. phonons — per D12):** S(Q,ω),
+    dispersions, DOS features, flat/soft branches, acoustic-mode checks, dynamic
+    structure factor; phonon analysis is a capability *inside* this pack, not a
+    standalone `phonons` pack.
   - **Symmetry:** symmetry checks, space-group comparison, irrep constraints, allowed tensor components.
 - **Definition of Done:** a user question routes to the correct domain pack and knowledge base; adding the pack required **no changes to core reasoning** (agent loop, schemas, tool layer, report generator) — only a new pack module, its registration, and its knowledge/eval assets. If core needs a change (as D10 did), make it a general one and fix it before the next pack.
 
@@ -510,9 +519,9 @@ tagged and the repo is pushed. What exists now:
 | Track | Done | Notes |
 |-------|------|-------|
 | A — Core Runtime | A0, A1, **A2 (full tool dispatch)** | A3 multi-agent still deferred |
-| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)** | **B4 not started — only `rmc`/`data` packs; no technique pack yet** |
+| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` technique packs)** | plugin architecture proven twice with no core reasoning changes; next pack `ins` |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus/CIF adapters) | all surfaces wrap the same core |
-| D — Trust & Quality | D1 (diagnostics), D2 (reports), D3 (eval harness) | D4 provenance-*enforcement* partial (block emitted, not yet rejected on absence); D5 later |
+| D — Trust & Quality | D1 (diagnostics), D2 (reports), D3 (eval harness), **D4 (provenance enforcement)** | reports with incomplete provenance are now rejected by output validation; D5 later |
 
 Built beyond the original slice: 18 agent tools + 3 composite skills, interactive
 chat (Milestone 2, `chat/v3`), plotting toolkit, MCP server (13 tools), and a
@@ -526,24 +535,21 @@ The old bottom-up tool ladder is **done**. The next frontier is proving the
 **plugin architecture with a real technique pack** (Track B4) and hardening
 trust (D4), not more one-off tools.
 
+Done in this pass: B4 `pdf` + `diffuse` packs, the D10 next-check-rules move,
+and D4 provenance enforcement (reports with incomplete provenance are rejected;
+model/prompt_version required once an LLM contributes).
+
 ```text
 Next:
-1.  B4 — PDF / total-scattering domain pack (the FIRST technique pack; the
-    acceptance test for "add a domain without touching core reasoning").
-    Deterministic diagnostics on G(r)/S(Q) files: low-r artifact, G(r)
-    −4πρr baseline-slope sign (encodes the known inverted-.gr gotcha),
-    first-peak position, S(Q)-vs-S(Q)−1 convention mismatch (the NOMAD
-    gotcha), Qmax reporting. Versioned prompt pdf_interpret/v1 + curated
-    PDF knowledge + eval cases pinned to FeCoSn/GaTa4Se8 real data.
-2.  Architecture: move next-check rules out of core/agent.py into the
-    DomainPack (per the placement rule — technique content belongs in the
-    pack); each pack ships its own offline next-checks.
-3.  D4 — provenance enforcement: reports missing a complete provenance
-    block are rejected by output validation, not just annotated.
-4.  B4 second technique pack (phonons or diffuse) once PDF proves the path;
-    if it needs core changes, fix core before the third.
-5.  Chat polish: surface tracking/waterfall plot paths in the reply;
+1.  B4 — `ins` pack (inelastic neutron scattering, incl. phonons per D12):
+    deterministic diagnostics on S(Q,ω) / dispersion / DOS data once such data
+    lands in data/. Needs example data first (acceptance = known answer).
+2.  D5 groundwork — assemble the case studies the packs now enable
+    (RMC convergence, inverted-.gr detection, diffuse contaminant/anisotropy)
+    into reproducible example runs for the publication evidence base.
+3.  Chat polish: surface tracking/waterfall/slice plot paths in the reply;
     optional streaming.
+4.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
 
 Rule still holds: every deterministic check must reproduce a known answer on
