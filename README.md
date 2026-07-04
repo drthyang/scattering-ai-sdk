@@ -13,10 +13,12 @@ interpret, and returns a structured, **provenance-carrying** report **with
 summarizing figures**. It never invents numbers, never mutates data, and works
 fully offline with local models.
 
-> Status: **early, but useful.** Four domain packs, auto-routing, figure-backed
-> reports, and an evaluation harness are in place and validated on real data.
+> Status: **early, but useful.** Five domains (`data`, `pdf`, `diffuse`,
+> `symmetry`, `rmc`), auto-routing, figure-backed reports, an evaluation harness,
+> and a human-reviewed **self-improvement loop** are in place and validated on
+> real data.
 
-**Docs:** [Quickstart](QUICKSTART.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Self-improvement](docs/self_improvement.md)
+**Docs:** [Quickstart](QUICKSTART.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Self-improvement](docs/self_improvement.md) · [Case studies](docs/case_studies.md)
 
 ## What it can tell you
 
@@ -139,6 +141,32 @@ input → auto-route to a domain pack → deterministic diagnostics (+ figures)
 - **Every number is traceable** to input data, a tool result, or a cited document.
 - **Reports are attributable** — the SDK rejects reports with incomplete provenance.
 - **Local-first** — no data leaves your machine unless you configure a cloud backend.
+
+## Self-improvement (the growth loop)
+
+Because capability here is **data-gated** — the correctness rule is *reproduce a
+known answer on real data*, and datasets, corrections, and failure modes arrive
+over months of research — the SDK is built to improve *during* use. An opt-in,
+**redacted**, local loop captures what real use reveals and turns it into
+**reviewable** improvements. It never edits scientific logic, prompts, schemas,
+or code on its own: it observes and proposes; a human approves; changes land as
+eval-gated, diff-only commits (design: [docs/self_improvement.md](docs/self_improvement.md)).
+
+```bash
+export SCATTERING_AI_JOURNAL=~/.scattering_ai/journal   # opt-in; default off
+scattering-ai analyze --file my_data.gr                 # each run/chat/MCP call may log a redacted episode
+scattering-ai learn status                              # aggregate view of the journal
+scattering-ai learn correct --target transition_temperature \
+    --statement "GaNb4Se8 transitions are 50 K and 29 K, not 39 K" --value 50,29
+scattering-ai learn review                              # signals -> tiered, reviewable proposals
+scattering-ai learn apply  --id <id> --approve          # Tier-0 data: eval-gated diff (human commits)
+scattering-ai learn brief  --id <id>                    # Tier-1/2: an agent work order (never a patch)
+scattering-ai learn watch  --brief                      # data-gated builds unblocked by new data/
+scattering-ai case-studies                              # known-answer runs on real data
+```
+
+Everything is category labels + identifiers — never data values — and every
+apply is gated by the test suite and audited. A human always makes the commit.
 
 ## Development
 

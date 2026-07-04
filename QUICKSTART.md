@@ -209,6 +209,21 @@ Third parties can ship a whole **domain pack** (diagnostics + knowledge + prompt
 + skills) via the `scattering_ai.domains` entry point without touching core — see
 [ROADMAP.md](ROADMAP.md), "Extensibility Architecture".
 
+### Let it improve with use (opt-in)
+
+The SDK can learn from your sessions — corrections, recurring failures — and turn
+them into reviewable, eval-gated improvements. It's off by default and never
+edits code on its own:
+
+```bash
+export SCATTERING_AI_JOURNAL=~/.scattering_ai/journal
+scattering-ai learn status     # what the journal has captured
+scattering-ai learn review     # signals -> tiered proposals you approve
+scattering-ai case-studies      # known-answer runs on real data
+```
+
+Full design and safety model: [docs/self_improvement.md](docs/self_improvement.md).
+
 ---
 
 See the [README](README.md) for the full feature list and [ROADMAP.md](ROADMAP.md)

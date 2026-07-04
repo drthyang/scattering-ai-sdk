@@ -24,6 +24,10 @@ data/
   `.npy`/`.npz`, HDF5/NeXus, instrument-specific — the IO layer will be built
   around whatever lands here. Exotic formats are useful too; include one.
 - Redacting/truncating is fine; structure matters more than the science.
+- **Which datasets the test suite uses** — to run the data-gated case studies
+  locally, and which future builds are waiting on data — is listed in
+  [docs/case_studies.md](../docs/case_studies.md#data-required-for-the-full-test-suite).
+  CI passes with no data here; those cases skip cleanly.
 
 ## Per-dataset notes (important)
 

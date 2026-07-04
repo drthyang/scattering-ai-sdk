@@ -134,6 +134,31 @@ inferred: `record_correction(episode, target, statement, corrected_value)` (API
   end-to-end; the GaNb4Se8 correction (`transition_temperature = 50,29`) lands as
   a Tier-0 regression case whose data-dependent check runs `detect_transitions`
   through the real subprocess gate.
+- **E7 — Agent briefs (DONE):** `learning/briefs.py` — `brief_from_proposal`
+  packages a Tier-1/Tier-2 proposal into an agent-ready work order (intent,
+  evidence, best-guess affected area, acceptance, non-negotiable constraints);
+  Tier-0 is rejected (it applies directly). `learn brief --id <id> [--write]`.
+  Per D15 the brief is **evidence + intent, never a patch**: it authorises no
+  merge; a coding agent (Codex / Claude Code) works it on an isolated branch a
+  human reviews.
+- **E8 — Data-gated watch queue (DONE):** `learning/watch.py` — a standing
+  `WATCH_QUEUE` (ins pack, T3 spin refinement) matched by filename globs under
+  `data/` (never reads data); `learn watch [--data DIR] [--brief]` reports which
+  data-gated builds are unblocked and, with `--brief`, emits an E7 brief for each.
+- **E9 — Knowledge growth (DONE):** a non-routing correction also yields a
+  `knowledge_snippet` proposal (Tier-0); `learn apply` writes a cited
+  `knowledge/learned/<domain>__<key>.md` through the eval gate. Remaining wiring:
+  re-index `knowledge/learned/` into the retriever so applied snippets are served.
+- **D6 — Adversarial robustness (STARTED):** the tier denylist/allowlist resist
+  `..` traversal and **symlink** escapes — every filesystem touch refuses to
+  traverse a symlink (`test_tier0_symlink_target_cannot_escape_into_source`),
+  landed from a Codex-delegated review. Method: delegate adversarial review to a
+  second agent, pin every confirmed finding as a regression case.
+- **D5 — Case studies (GROUNDWORK):** `evaluation/case_studies.py` +
+  `scattering-ai case-studies` — known-answer runs (two on committed RMC demo
+  data, three on local facility data that skip cleanly in CI). New corrections
+  seed both a case study and a regression case, so publication evidence and the
+  suite grow from the same source. See [case_studies.md](case_studies.md).
 
 ## Using P1 today
 

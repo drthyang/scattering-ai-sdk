@@ -2,17 +2,60 @@
 
 ## Unreleased
 
-### Human-reviewed self-improvement — Phase 1 (capture journal)
-- New opt-in `learning/journal.py`: an append-only, **redacted**, **local**
-  episode log (category labels + identifiers only — never data arrays, evidence
-  values, or message text) wired into `Agent.analyze` and surfaced by
-  `scattering-ai learn status`. Off by default; enable with
-  `Agent(journal=...)` or `SCATTERING_AI_JOURNAL`. Read-only and best-effort —
-  a journaling failure never affects the analysis.
-- Full design in [docs/self_improvement.md](docs/self_improvement.md): the
-  system observes and proposes but **never** edits scientific logic, prompts,
-  schemas, or code automatically; approved changes are diff-only, human-committed,
-  and eval-gated (decisions: diff-only apply, LLM for prose only, local-first).
+### Human-reviewed self-improvement — the growth loop (Track E)
+A standing loop that turns real use into reviewed capability, so the SDK grows
+with the researcher instead of waiting on a finished spec. The core principle
+holds throughout: the system **observes and proposes**; every change to logic,
+prompts, schemas, or code passes an explicit human approval and lands as an
+eval-gated, diff-only change — enforced structurally (tiers, denylists, eval
+gates), not by policy. Full design in
+[docs/self_improvement.md](docs/self_improvement.md); roadmap Track E + D14/D15.
+
+- **Capture (P1 + E6, `learning/journal.py`):** an opt-in, append-only,
+  **redacted** episode log — category labels + identifiers only, never data
+  arrays, evidence values, or message text. Wired into `Agent.analyze`, into
+  `ChatSession` (a redacted episode per *signal-bearing* chat turn — a tool
+  error or a no-reply dead-end), and into the MCP server (a `surface="mcp"`
+  episode on a failing tool call — name only). Off by default
+  (`SCATTERING_AI_JOURNAL` / `Agent(journal=...)`), best-effort. `learn status`.
+- **Signals + corrections (P2, `learning/signals.py`):** deterministic signal
+  extraction (`error_outcome`, `unhandled_warning`, `provenance_gap`,
+  `low_confidence`, `interpretation_unavailable`, `empty_result`) with no LLM
+  and no data values. Human-only corrections — `Agent.record_correction`,
+  `ChatSession.record_correction`, `learn correct` — stored verbatim, never
+  inferred. `learn signals` clusters by (type, domain, key), ranked by
+  severity × recurrence.
+- **Proposals (P3, `learning/proposals.py`):** each cluster becomes a
+  tier-classified `Proposal` from a deterministic template; an optional LLM
+  polishes **only** title/rationale, never evidence or suggested values.
+  `learn review` renders markdown grouped by tier.
+- **Guarded apply (P4, `learning/apply.py`):** nothing applies without explicit
+  approval. Tier-0 writes an allowlisted data diff (`tests/regressions/`,
+  `knowledge/`), runs a subprocess **eval gate**, and keeps it only if green —
+  else reverts byte-for-byte. Tier-1 drafts, Tier-2 hands off a task; a denylist
+  (`src/`, `schemas.py`) raises `TierViolation` on any source write, including
+  paths that traverse a **symlink** (D6 hardening, found by a Codex-delegated
+  review). Every apply is audited to `applied.jsonl`.
+- **Closed loop (P5):** `tests/test_regressions.py` is the permanent gate;
+  applied cases carry a `check` — a `series_transitions` case synthesizes a
+  temperature series and asserts the **real** `detect_transitions` recovers the
+  corrected temperatures, so a scientific regression fails the gate. The
+  GaNb4Se8 `transition_temperature = 50,29` correction lands end-to-end.
+- **Agent briefs (E7, `learning/briefs.py`):** a Tier-1/2 proposal becomes an
+  agent-ready work order (`learn brief`) — evidence + intent, never a patch —
+  for a coding agent (Codex / Claude Code) to implement on an isolated branch a
+  human reviews.
+- **Data-gated watch queue (E8, `learning/watch.py`):** a standing queue (`ins`
+  pack, T3 spin refinement) matched by filename globs under `data/`;
+  `learn watch [--brief]` flags which builds are unblocked by newly-arrived data.
+- **Knowledge growth (E9):** a non-routing correction also proposes a
+  `knowledge_snippet` (Tier-0); applying it writes a cited
+  `knowledge/learned/<domain>__<key>.md` through the eval gate.
+- **Case-study harness (D5, `evaluation/case_studies.py`):** `scattering-ai
+  case-studies` runs known-answer cases — two on committed RMC demo data, three
+  on local facility data (inverted `.gr`, GaNb4Se8 transition, CORELLI
+  anisotropy) that skip cleanly in CI. Feeds the publication and doubles as
+  integration coverage.
 
 ### Frustration / k-vector check
 - **`kvector_check_from_mcif`** + **`skill_frustration_check`**: is the spin
