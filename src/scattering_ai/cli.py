@@ -274,9 +274,32 @@ def main(argv: list[str] | None = None) -> int:
     learn_brief.add_argument("--write", action="store_true",
                              help="Also write the brief into <journal>/briefs/")
 
+    learn_watch = learn_sub.add_parser(
+        "watch", help="Data-gated capability queue: which roadmap builds are "
+        "unblocked by data now present in data/")
+    learn_watch.add_argument("--data", default="data",
+                             help="Data root to scan (default: ./data)")
+    learn_watch.add_argument("--brief", action="store_true",
+                             help="Emit an agent brief for each ready build")
+
     args = parser.parse_args(argv)
     if args.command == "learn":
         from scattering_ai.learning.journal import Journal, resolve_journal_dir
+
+        if args.learn_command == "watch":  # no journal needed — scans data/
+            from scattering_ai.learning.watch import watch_proposals, watch_status
+
+            if args.brief:
+                from scattering_ai.learning.briefs import brief_from_proposal, render_brief
+
+                ready = watch_proposals(args.data)
+                if not ready:
+                    print("No watched builds are unblocked yet.")
+                for proposal in ready:
+                    print(render_brief(brief_from_proposal(proposal)))
+            else:
+                print(json.dumps(watch_status(args.data), indent=2))
+            return 0
 
         directory = resolve_journal_dir(args.journal or None)
         if directory is None:

@@ -587,14 +587,20 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
 - **DoD:** a recurring, reproduced failure cluster produces a brief a human runs
   to get a reviewable branch; the loop never merges it.
 
-#### E8 — Data-gated capability queue
+#### E8 — Data-gated capability queue (✅ mechanism, 2026-07)
 
 - **Goal:** make the data-gating explicit. Capability the roadmap wants but
-  lacks data for (INS/S(Q,ω), Spinvert reference sets, rep-theory tables) sits
-  in a **watch queue**; when matching data lands in `data/`, the loop flags it,
-  scaffolds the pack/tool skeleton + eval placeholders, and opens a brief (E7).
-- **DoD:** dropping S(Q,ω) data into `data/` raises a "ready to build `ins`"
-  proposal with a scaffolded pack stub and a pinned known-answer eval to fill.
+  lacks data for (INS/S(Q,ω), Spinvert reference sets) sits in a **watch queue**;
+  when matching data lands in `data/`, the loop flags it and opens a brief (E7).
+- **Done:** `learning/watch.py` — a standing `WATCH_QUEUE` (ins pack, T3 spin
+  refinement) matched by filename globs (never reads data); `scan_watch_queue`,
+  `watch_proposals` (a Tier-2 `task` per unblocked build), `watch_status`, and
+  `learn watch [--data DIR] [--brief]`. Composes with E7: `--brief` emits an
+  agent brief for each ready build.
+- **Remaining:** richer scaffold (write the pack skeleton + eval placeholder
+  into the brief); the brief currently points the agent at what to build.
+- **DoD ✅:** dropping S(Q,ω)-named data into `data/` flips `learn watch` to
+  "ready to build `ins`" and yields a Tier-2 task → brief.
 
 #### E9 — Knowledge growth (✅ 2026-07)
 
