@@ -47,3 +47,7 @@ reports_out/
 # Editors
 .idea/
 .vscode/
+
+# self-improvement journal (local, never committed)
+.scattering_ai/
+episodes.jsonl

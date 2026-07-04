@@ -16,7 +16,7 @@ fully offline with local models.
 > Status: **early, but useful.** Four domain packs, auto-routing, figure-backed
 > reports, and an evaluation harness are in place and validated on real data.
 
-**Docs:** [Quickstart](QUICKSTART.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
+**Docs:** [Quickstart](QUICKSTART.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Self-improvement](docs/self_improvement.md)
 
 ## What it can tell you
 

@@ -108,16 +108,21 @@ class Agent:
         model_id: str = "",
         knowledge_root: Path | str | None = None,
         workspace: Path | str | None = None,
+        journal: Path | str | None = None,
     ):
         self.llm = llm
         self.model_id = model_id
         self.knowledge_root = knowledge_root or default_knowledge_root()
         self.workspace = workspace
+        self.journal = journal  # opt-in self-improvement episode log (P1)
 
     def analyze(self, request: AnalysisRequest) -> AnalysisReport:
+        import time as _time
+
         from scattering_ai.core.files import expand_files
         from scattering_ai.domains.router import resolve_domain
 
+        _t0 = _time.time()
         # Globs/directories in `files` become concrete paths so a series or a
         # folder "just works" through the Python API too, matching the CLI.
         if request.data.files:
@@ -183,7 +188,27 @@ class Agent:
                 timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             ),
         )
-        return report.assert_valid(requires_model=self.llm is not None)
+        report.assert_valid(requires_model=self.llm is not None)
+        self._journal(report, findings, request.data.files, _time.time() - _t0)
+        return report
+
+    def _journal(self, report, findings, files, duration) -> None:
+        """Append a redacted episode when journaling is configured (opt-in).
+        Best-effort: a journaling failure must never affect the analysis."""
+        from scattering_ai.learning.journal import (
+            Journal,
+            episode_from_analysis,
+            resolve_journal_dir,
+        )
+
+        directory = resolve_journal_dir(self.journal)
+        if directory is None:
+            return
+        try:
+            Journal(directory).record(
+                episode_from_analysis(report, findings, files, duration=duration))
+        except Exception:
+            pass
 
     def _retrieve(self, request: AnalysisRequest, pack: DomainPack) -> list[RetrievedChunk]:
         if not request.options.use_rag or self.knowledge_root is None:

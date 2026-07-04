@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Human-reviewed self-improvement — Phase 1 (capture journal)
+- New opt-in `learning/journal.py`: an append-only, **redacted**, **local**
+  episode log (category labels + identifiers only — never data arrays, evidence
+  values, or message text) wired into `Agent.analyze` and surfaced by
+  `scattering-ai learn status`. Off by default; enable with
+  `Agent(journal=...)` or `SCATTERING_AI_JOURNAL`. Read-only and best-effort —
+  a journaling failure never affects the analysis.
+- Full design in [docs/self_improvement.md](docs/self_improvement.md): the
+  system observes and proposes but **never** edits scientific logic, prompts,
+  schemas, or code automatically; approved changes are diff-only, human-committed,
+  and eval-gated (decisions: diff-only apply, LLM for prose only, local-first).
+
 ### Frustration / k-vector check
 - **`kvector_check_from_mcif`** + **`skill_frustration_check`**: is the spin
   arrangement a single-k ordered structure? Shell correlations are compared to

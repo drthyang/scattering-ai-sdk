@@ -212,7 +212,24 @@ def main(argv: list[str] | None = None) -> int:
     plot_cmd.add_argument("--fit", default="",
                           help="Comma-separated centers: fit peaks there and plot the fit")
 
+    learn_cmd = sub.add_parser(
+        "learn", help="Self-improvement: review the local analysis journal "
+        "(read-only; opt-in via SCATTERING_AI_JOURNAL)")
+    learn_sub = learn_cmd.add_subparsers(dest="learn_command", required=True)
+    learn_status = learn_sub.add_parser("status", help="Summarize the episode journal")
+    learn_status.add_argument("--journal", default="",
+                              help="Journal directory (default: $SCATTERING_AI_JOURNAL)")
+
     args = parser.parse_args(argv)
+    if args.command == "learn":
+        from scattering_ai.learning.journal import Journal, resolve_journal_dir
+
+        directory = resolve_journal_dir(args.journal or None)
+        if directory is None:
+            sys.exit("error: no journal configured; set SCATTERING_AI_JOURNAL or "
+                     "pass --journal DIR")
+        print(json.dumps(Journal(directory).summary(), indent=2))
+        return 0
     if args.command == "mcp":
         from scattering_ai.server.mcp import serve
 
