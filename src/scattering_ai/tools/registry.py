@@ -416,6 +416,42 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         lat, pos, sp = _structure(path)
         return sym.magnetic_symmetry(lat, pos, sp, magmoms)
 
+    def simulate_gr_from_cif(path: str, rmax: float = 20.0, sigma: float = 0.1,
+                             radiation: str = "neutron") -> dict:
+        from scattering_ai.tools.gr_model import simulate_gr
+
+        lat, pos, sp = _structure(path)
+        sim = simulate_gr(lat, pos, sp, rmax=rmax, sigma=sigma, radiation=radiation)
+        out_path = artifact("gr_model", ".dat")
+        np.savetxt(out_path, np.column_stack([sim["r"], sim["g"]]),
+                   header="r  G(r) model")
+        from scattering_ai.tools.models import Curve1D
+
+        peaks = c.find_peaks(Curve1D(x=sim["r"], y=sim["g"]), subtract_background=False)
+        return {"saved": str(out_path), "n_atoms": sim["n_atoms"],
+                "radiation": radiation, "first_peaks": peaks[:8]}
+
+    def fit_gr_model(gr_path: str, cif_path: str, radiation: str = "neutron",
+                     rmin: float = 1.0, rmax: float | None = None) -> dict:
+        from scattering_ai.tools.gr_model import fit_gr
+
+        curve = load_curve(gr_path)
+        lat, pos, sp = _structure(cif_path)
+        fit = fit_gr(curve.x, curve.y, lat, pos, sp, radiation=radiation,
+                     rmin=rmin, rmax=rmax)
+        if "error" in fit:
+            return fit
+        result = {k: fit[k] for k in ("rw", "scale", "sigma", "lattice_scale",
+                                      "fit_range", "n_points", "radiation",
+                                      "assessment", "note")}
+        try:
+            from scattering_ai.tools.plotting import plot_gr_fit
+
+            result["plot"] = plot_gr_fit(fit, artifact("gr_fit", ".png"))
+        except ImportError:
+            pass
+        return result
+
     def read_rmc6f(path: str) -> dict:
         from scattering_ai.tools.rmc_files import read_rmc6f as _read
 
@@ -722,6 +758,33 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "mCIF. Returns the image path and a structure summary.",
                 _params({"path": string, "bonds": {"type": "boolean"}}, ["path"]),
                 plot_structure,
+            ),
+            AgentTool(
+                "simulate_gr_from_cif",
+                "Compute the model PDF G(r) of a crystal structure (CIF): pair "
+                "sums with neutron scattering lengths (or radiation='xray' Z "
+                "weighting) and Gaussian broadening sigma. Saves the model curve "
+                "and returns its first peaks.",
+                _params(
+                    {"path": string, "rmax": number, "sigma": number,
+                     "radiation": string},
+                    ["path"],
+                ),
+                simulate_gr_from_cif,
+            ),
+            AgentTool(
+                "fit_gr_model",
+                "Fit a structure model (CIF) to a measured G(r): scale, Gaussian "
+                "peak width, and a lattice-scale factor, with the Rw quality "
+                "metric and a data/model/difference plot. THE tool for 'does "
+                "this structure explain my PDF?' questions (comparison fit; full "
+                "refinement is PDFgui territory).",
+                _params(
+                    {"gr_path": string, "cif_path": string, "radiation": string,
+                     "rmin": number, "rmax": opt_number},
+                    ["gr_path", "cif_path"],
+                ),
+                fit_gr_model,
             ),
             AgentTool(
                 "read_rmc6f",

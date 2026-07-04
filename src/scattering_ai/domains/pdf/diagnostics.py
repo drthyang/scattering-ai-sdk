@@ -223,10 +223,61 @@ def _summary_figure(files: list[str], workspace) -> list[Finding]:
     return []
 
 
+def _model_comparison(files: list[str], workspace) -> list[Finding]:
+    """When a CIF accompanies a measured G(r), fit the structure model to it
+    (scale, broadening, lattice scale) and report Rw with an overlay figure."""
+    cifs = [f for f in files if f.lower().endswith((".cif", ".mcif"))]
+    grs = []
+    for f in files:
+        if f.lower().endswith((".cif", ".mcif")) or not Path(f).exists():
+            continue
+        try:
+            curve = load_curve(f)
+        except Exception:
+            continue
+        if is_r_space(curve):
+            grs.append((f, curve))
+    if not cifs or not grs:
+        return []
+    try:
+        from scattering_ai.tools.cif import read_structure
+        from scattering_ai.tools.gr_model import fit_gr
+
+        s = read_structure(cifs[0])
+        gr_path, curve = grs[0]
+        fit = fit_gr(curve.x, curve.y, s["lattice"], s["positions"], s["species"])
+        if "error" in fit:
+            return []
+        figures = []
+        if workspace is not None:
+            try:
+                from scattering_ai.tools.plotting import plot_gr_fit
+
+                figures.append(plot_gr_fit(fit, Path(workspace) / "gr_model_fit.png"))
+            except ImportError:
+                pass
+        severity = Severity.INFO if fit["rw"] < 0.4 else Severity.WARNING
+        return [Finding(
+            diagnostic="pdf_model_fit", severity=severity,
+            message=f"Structure model {Path(cifs[0]).name} vs {Path(gr_path).name}: "
+            f"Rw = {fit['rw']:.3f} ({fit['assessment']}), peak width "
+            f"{fit['sigma']:.3f} Å, lattice scale ×{fit['lattice_scale']:.4f}.",
+            evidence={k: fit[k] for k in ("rw", "scale", "sigma", "lattice_scale",
+                                          "fit_range", "assessment")} | {"figures": figures},
+        )]
+    except Exception as exc:
+        return [Finding(diagnostic="pdf_model_fit", severity=Severity.WARNING,
+                        message=f"Model comparison failed: {type(exc).__name__}: {exc}",
+                        evidence={})]
+
+
 def run_all(files: list[str], workspace=None) -> list[Finding]:
     findings: list[Finding] = []
     for f in files:
+        if f.lower().endswith((".cif", ".mcif")):
+            continue  # the CIF is the model, not data to diagnose
         findings.extend(diagnose_file(f))
+    findings.extend(_model_comparison(files, workspace))
     findings.extend(_summary_figure(files, workspace))
     return findings
 
@@ -244,5 +295,8 @@ NEXT_CHECK_RULES: dict[str, str] = {
     "'sq_minus_1' and verify the resulting G(r) baseline and first-peak position.",
     "pdf_unreadable": "Confirm the file format and column layout; the reader "
     "expected a two-column ASCII or pdfgetx .gr/.fq file.",
+    "pdf_model_fit": "If Rw is poor, check the radiation type (neutron vs x-ray "
+    "weighting), the fit range, and whether the structure is the right phase; "
+    "for full refinement (ADPs, occupancies) move to PDFgui/diffpy-CMI.",
     "missing_files": "Locate or regenerate the missing files before trusting the analysis.",
 }

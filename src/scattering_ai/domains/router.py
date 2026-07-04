@@ -66,9 +66,14 @@ def detect_domain(request: AnalysisRequest) -> tuple[str, str]:
     for p in files:
         if p.suffix.lower() == ".rmc6f":
             return "rmc", f"RMCProfile configuration ({p.name})"
-    for p in files:
-        if p.suffix.lower() in _SYMMETRY_SUFFIXES:
-            return "symmetry", f"crystal structure ({p.name})"
+    has_cif = any(p.suffix.lower() in _SYMMETRY_SUFFIXES for p in files)
+    has_ts = any(p.suffix.lower() in _PDF_SUFFIXES or _looks_like_total_scattering(p)
+                 for p in files)
+    if has_cif and has_ts:  # structure + measured PDF = model-comparison intent
+        return "pdf", "total-scattering curve + structure model (CIF)"
+    if has_cif:
+        p = next(p for p in files if p.suffix.lower() in _SYMMETRY_SUFFIXES)
+        return "symmetry", f"crystal structure ({p.name})"
     for p in files:
         if _is_hdf5(p) or p.suffix.lower() in _SLICE_SUFFIXES:
             return "diffuse", f"reciprocal-space volume/slice ({p.name})"

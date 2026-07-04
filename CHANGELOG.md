@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### PDF model fitting from a structure (community priority #1)
+- `simulate_gr_from_cif`: the model G(r) of a crystal structure — supercell
+  pair sums with **neutron scattering lengths** (or x-ray Z weighting) and
+  Gaussian broadening. Physics check: Ti's negative b makes the Ti–O shell a
+  negative dip with neutrons and a positive peak with x-rays.
+- `fit_gr_model`: fit a structure model (CIF) to a measured G(r) — scale,
+  peak width σ, and a lattice-scale factor — with the **Rw** metric and a
+  data/model/difference overlay figure. Self-consistency: exact parameter
+  recovery at Rw ≈ 1e-4; a wrong model gives Rw ≈ 1. A comparison fit —
+  full refinement (ADPs, occupancies) remains PDFgui/diffpy territory.
+- **CIF + G(r) together auto-route to `pdf`** (model-comparison intent; a CIF
+  alone still routes to `symmetry`), and the pdf pack reports the fit with the
+  overlay figure automatically.
+
+### Multiple phase transitions (user-reported correction)
+- GaNb4Se8's true transitions are ~50 K and ~29 K; the old single-changepoint
+  detector reported a fictitious 39 K (an average forced between two real
+  kinks). `detect_transitions` now fits up to two changepoints (3-segment
+  model), and detections from many peaks/observables are **clustered** into
+  distinct candidate transitions instead of collapsed into one median. The
+  real series now yields ~54.3 K (bracketing 50 K at the 5 K step size) and
+  ~39 K as separate candidates.
+
 ### Fixes + performance (full live verification pass)
 - **Fix:** file entries containing glob characters (`[h,0,0]`, `(0,k,l)` — real
   facility filenames) were mangled by glob expansion, mis-routing e.g. the

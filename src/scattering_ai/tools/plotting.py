@@ -253,3 +253,24 @@ def plot_profile(
     ax.set_ylabel(profile.ylabel)
     ax.set_title(title or "azimuthal profile (red = contaminant match)")
     return _finish(fig, out)
+
+
+def plot_gr_fit(fit: dict[str, Any], out: str | Path, title: str = "") -> str:
+    """Measured vs model G(r) with a difference curve below."""
+    plt = _plt()
+    r, g_obs, g_calc = fit["r"], fit["g_obs"], fit["g_calc"]
+    fig, (ax, axd) = plt.subplots(2, 1, figsize=(9, 6), sharex=True,
+                                  height_ratios=[3, 1])
+    ax.plot(r, g_obs, "o", ms=2.5, color="#1f5fa8", label="data")
+    ax.plot(r, g_calc, "-", lw=1.4, color="crimson",
+            label=f"model (Rw={fit['rw']:.3f})")
+    ax.set_ylabel("G(r)")
+    ax.legend(fontsize=9)
+    ax.set_title(title or
+                 f"G(r) model fit: Rw={fit['rw']:.3f}, sigma={fit['sigma']:.3f} A, "
+                 f"lattice x{fit['lattice_scale']:.4f}")
+    axd.plot(r, g_obs - g_calc, "-", lw=0.9, color="#555")
+    axd.axhline(0, color="#bbb", lw=0.7)
+    axd.set_xlabel("r (Å)")
+    axd.set_ylabel("diff")
+    return _finish(fig, out)

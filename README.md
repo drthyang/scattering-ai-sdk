@@ -24,6 +24,7 @@ fully offline with local models.
 |-------------|--------------------------------------------------------|--------|
 | A **T/field scan** of patterns | Whether there's a **phase transition**, its T_c, and which peaks move | waterfall + peak tracking |
 | A **G(r) / S(Q)** curve | Non-standard/inverted G(r), low-r artifacts, first-neighbour distance, S(Q) vs S(Q)−1 | overview plot |
+| A **G(r) + a CIF** | **Does this structure explain the PDF?** — model fit with Rw, peak width, lattice scale | data/model/difference |
 | A **diffuse volume / slice** | Bragg-vs-diffuse character, contaminant rings, Bragg-punch coverage, sampling anisotropy; **3D-ΔPDF** (punch → apodize → FFT) | log-scale map / ΔPDF slice |
 | A **crystal structure (CIF/mCIF)** | Space group + Wyckoff sites, **maximal subgroups** (phase-transition pathways), pseudosymmetric parent, magnetic space group | structure view + subgroup tree |
 | **RMC monitor state** | Convergence trend, Bragg/PDF & neutron/x-ray conflicts, missing files | — |

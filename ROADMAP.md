@@ -584,9 +584,9 @@ the last is a short step since the SDK already parses mCIF moments.
 
 ```text
 Next (impact-ordered):
-1.  PDF model comparison: simulate G(r) from a CIF (pair sums + Debye-Waller)
-    and compare/fit against a measured G(r) — the single most-used PDF
-    workflow in the community; turns the pdf pack from QC into analysis.
+1.  DONE (2026-07): PDF model comparison — simulate_gr_from_cif + fit_gr_model
+    (scale, sigma, lattice scale, Rw, overlay figure); CIF+G(r) auto-routes to
+    the pdf pack, which reports the fit automatically.
 2.  OPTIMADE structure lookup tool: query the federated crystal-structure
     databases (COD/MP/OQMD/...) by composition/cell to identify candidate
     phases for an observed pattern — cheap REST integration, large agent value.
