@@ -107,3 +107,42 @@ def test_unknown_domain_raises_with_available_list():
         assert "rmc" in str(exc)
     else:
         raise AssertionError("expected KeyError for unknown domain")
+
+
+def test_llm_reasoning_block_is_stripped():
+    """qwen3/gemma-style <think> blocks must not break JSON extraction."""
+    payload = {"summary": "healthy", "confidence": "high"}
+    fake = FakeLLM(f"<think>The Bragg series looks {{noisy}} but fine.</think>\n"
+                   f"{json.dumps(payload)}")
+    report = analyze(domain="rmc", question="?", data=stalled_run_data(),
+                     llm=fake, model_id="fake")
+    assert report.summary == "healthy"
+    assert report.confidence == Confidence.HIGH
+
+
+class SequenceLLM:
+    """Returns a scripted sequence of responses across successive calls."""
+
+    def __init__(self, contents):
+        self._contents = list(contents)
+        self.n_calls = 0
+
+    @property
+    def capabilities(self) -> ModelCapabilities:
+        return ModelCapabilities(tool_use=False)
+
+    def complete(self, messages, tools=None) -> LLMResponse:
+        content = self._contents[min(self.n_calls, len(self._contents) - 1)]
+        self.n_calls += 1
+        return LLMResponse(content=content, model="seq")
+
+
+def test_bad_json_retry_recovers():
+    """A prose-only first reply triggers one corrective retry; the JSON second
+    reply is used instead of falling back."""
+    good = json.dumps({"summary": "recovered on retry", "confidence": "low"})
+    llm = SequenceLLM(["Sure! Here is what I found in plain prose.", good])
+    report = analyze(domain="rmc", question="?", data=stalled_run_data(),
+                     llm=llm, model_id="fake")
+    assert llm.n_calls == 2  # initial + one retry
+    assert report.summary == "recovered on retry"

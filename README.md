@@ -32,8 +32,13 @@ Python API — works fully offline (deterministic diagnostics + cited knowledge 
 ```python
 from scattering_ai import analyze
 
-report = analyze(domain="rmc", question="Is this run healthy?", data=rmc_monitor_json)
+# domain auto-detected from the input (a G(r) -> pdf, a volume -> diffuse,
+# RMC state -> rmc); pass domain=... to override.
+report = analyze(data={"files": ["FeCoSn_100K.gr"]})
+print(report.domain)        # -> "pdf"
 print(report.markdown)      # or report.model_dump_json()
+
+report = analyze(domain="rmc", question="Is this run healthy?", data=rmc_monitor_json)
 ```
 
 ```python
@@ -51,21 +56,21 @@ CLI:
 scattering-ai analyze examples/rmc_monitor_demo/stalled_run.json               # offline
 scattering-ai analyze run.json --backend lmstudio --model m --out report.md   # with local LLM
 
-# tool-driven analysis of a data file: the agent inspects, cuts, and fits
+# just point it at a file — the domain is auto-detected (offline diagnostics):
+scattering-ai analyze --file my_pattern.gr
+
+# tool-driven analysis with a local LLM (the agent inspects, cuts, and fits):
 scattering-ai analyze --file my_pattern.gr \
     --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
-
-# domain diagnostics run offline (no LLM). PDF pack checks G(r) baseline slope,
-# low-r artifacts, first-peak distance, and S(Q) vs S(Q)-1 convention:
-scattering-ai analyze --file my_pattern.gr --domain pdf --question "Healthy G(r)?"
 ```
 
-Domains: `rmc` (run health), `pdf` (total scattering / G(r) & S(Q)), `diffuse`
-(single-crystal diffuse / 3D-ΔPDF volumes & slices), and `data` (generic
-tool-driven). Each pack ships its own diagnostics, knowledge, prompt, and
-next-check rules; third parties add packs via the `scattering_ai.domains` entry
-point without touching core. Every returned report is fully attributable — the
-SDK rejects reports with incomplete provenance.
+Domains (auto-detected from the input, or pass `--domain` / `domain=`): `rmc`
+(run health), `pdf` (total scattering / G(r) & S(Q)), `diffuse` (single-crystal
+diffuse / 3D-ΔPDF volumes & slices), and `data` (generic tool-driven). Each pack
+ships its own diagnostics, knowledge, prompt, and next-check rules; third parties
+add packs via the `scattering_ai.domains` entry point without touching core.
+Every returned report is fully attributable — the SDK rejects reports with
+incomplete provenance.
 
 Interactive chat — iterative analysis with tools and skills (history and
 artifacts persist across turns; transcript saved for provenance):

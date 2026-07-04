@@ -46,7 +46,7 @@ class AnalysisData(BaseModel):
 class AnalysisRequest(BaseModel):
     schema_version: str = SCHEMA_VERSION
     project: str = ""
-    domain: str
+    domain: str = "auto"  # "auto" routes to the best pack from the input
     question: str
     data: AnalysisData = Field(default_factory=AnalysisData)
     options: AnalysisOptions = Field(default_factory=AnalysisOptions)
@@ -106,6 +106,7 @@ class Provenance(BaseModel):
 class AnalysisReport(BaseModel):
     schema_version: str = SCHEMA_VERSION
     status: str = "ok"
+    domain: str = ""  # the pack that handled this (resolved from "auto")
     summary: str = ""
     observations: list[str] = Field(default_factory=list)
     interpretation: list[str] = Field(default_factory=list)

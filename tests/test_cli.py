@@ -41,15 +41,14 @@ def test_cli_healthy_run_prints_to_stdout(capsys):
     assert "healthy" in out.lower()
 
 
-def test_cli_bare_payload_requires_domain_and_question(tmp_path):
+def test_cli_bare_payload_auto_routes(tmp_path, capsys):
+    """A bare payload now auto-routes (no --domain needed): r_values -> rmc."""
     bare = tmp_path / "bare.json"
     bare.write_text(json.dumps({"r_values": [10.0, 9.0, 8.0, 7.0, 6.0]}))
-    try:
-        main(["analyze", str(bare)])
-    except SystemExit as exc:
-        assert "domain" in str(exc.code)
-    else:
-        raise AssertionError("expected SystemExit for bare payload without flags")
+    rc = main(["analyze", str(bare)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "decreasing" in out  # rmc diagnostics ran
 
 
 def test_cli_bare_payload_with_flags(tmp_path, capsys):

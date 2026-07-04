@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Domain auto-routing — one entry point
+- `analyze()` now defaults to `domain="auto"`: the SDK picks the technique pack
+  from the input (`domains/router.py`) — RMC run state → `rmc`, a
+  reciprocal-space volume/slice → `diffuse`, a G(r)/S(Q)/F(Q) curve → `pdf`,
+  anything else → `data`. The resolved pack is on `report.domain`, and an
+  offline run explains the routing in its first observation.
+- `scattering-ai analyze --file X` needs no `--domain` (and `--question` now
+  defaults); the MCP `analyze` tool's `domain` is optional (`auto`). Explicit
+  `domain=...` still overrides.
+- **LLM loop hardened** (the fix for local models emitting non-JSON): the parser
+  strips `<think>` reasoning blocks and code fences and extracts the last
+  balanced JSON object; on failure the agent does one corrective retry asking
+  for JSON only before falling back. No more silent "interpretation unavailable"
+  on the first prose reply.
+
 ### Provenance enforcement (D4)
 - Reports with an incomplete provenance block are now **rejected by output
   validation** (`ReportValidationError`), not silently returned. `sdk_version`,

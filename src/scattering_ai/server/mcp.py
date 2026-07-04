@@ -32,21 +32,24 @@ ANALYZE_TOOL = {
     "description": (
         "Run the SDK's full analysis loop on structured scientific state: "
         "deterministic diagnostics, cited knowledge retrieval, and a "
-        "provenance-carrying report. domain: 'rmc' (run health from RMC "
-        "monitor state) or 'data' (file-based). Returns the report as JSON."
+        "provenance-carrying report. domain is optional — omit it (or pass "
+        "'auto') to route by the input: 'pdf' (G(r)/S(Q) curves), 'diffuse' "
+        "(reciprocal-space volumes/slices), 'rmc' (RMC monitor state), or "
+        "'data' (generic). The chosen pack is on report.domain. Returns JSON."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "domain": {"type": "string", "enum": ["rmc", "data"]},
+            "domain": {"type": "string",
+                       "enum": ["auto", "rmc", "pdf", "diffuse", "data"]},
             "question": {"type": "string"},
             "data": {
                 "type": "object",
                 "description": "AnalysisData payload (run_summary/r_values/files/"
-                "plots/metadata); for domain=data put file paths in 'files'",
+                "plots/metadata); put file paths in 'files'",
             },
         },
-        "required": ["domain", "question"],
+        "required": ["question"],
     },
 }
 
@@ -75,7 +78,7 @@ def _run_analyze(arguments: dict[str, Any], workspace: Path) -> dict[str, Any]:
 
     try:
         request = AnalysisRequest(
-            domain=arguments["domain"],
+            domain=arguments.get("domain") or "auto",
             question=arguments["question"],
             data=arguments.get("data") or {},
         )

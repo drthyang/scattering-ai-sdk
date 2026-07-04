@@ -524,10 +524,16 @@ tagged and the repo is pushed. What exists now:
 | D — Trust & Quality | D1 (diagnostics), D2 (reports), D3 (eval harness), **D4 (provenance enforcement)** | reports with incomplete provenance are now rejected by output validation; D5 later |
 
 Built beyond the original slice: 18 agent tools + 3 composite skills, interactive
-chat (Milestone 2, `chat/v3`), plotting toolkit, MCP server (13 tools), and a
+chat (Milestone 2, `chat/v3`), plotting toolkit, MCP server (13 tools), a
 **robust transition-tracing workflow** (stacked peak selection, auto-detected
 mask sentinel, per-peak monitoring summary — validated on the GaNb4Se8 39 K
-structural transition). 120 tests, CI, CHANGELOG.
+structural transition), and **domain auto-routing** (one entry point picks the
+pack from the input; `analyze(data={"files":[…]})` with no domain). CI, CHANGELOG.
+
+All four packs verified live on Ollama (gemma4:26b): PDF flags the inverted
+neutron `.gr`; diffuse reports the CORELLI 4.5× sampling anisotropy and a Cu
+ring as weak evidence; auto-routing + a JSON-retry loop fixed the local-model
+"interpretation unavailable" failure.
 
 ## Immediate Next Actions
 

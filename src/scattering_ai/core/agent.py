@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -45,19 +46,54 @@ def _default_workspace() -> Path:
     return Path(tempfile.mkdtemp(prefix="scattering_ai_"))
 
 
+_THINK_BLOCK = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
+
+
+def _top_level_objects(text: str) -> list[str]:
+    """Every balanced top-level ``{...}`` span, string-literal aware."""
+    spans: list[str] = []
+    depth = start = 0
+    in_str = esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0:
+                spans.append(text[start : i + 1])
+    return spans
+
+
 def _parse_llm_json(content: str) -> dict | None:
-    text = content.strip()
-    if text.startswith("```"):
-        text = text.strip("`")
-        text = text[text.find("{") :] if "{" in text else text
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end <= start:
-        return None
-    try:
-        parsed = json.loads(text[start : end + 1])
-    except json.JSONDecodeError:
-        return None
-    return parsed if isinstance(parsed, dict) else None
+    """Extract the answer JSON from a model reply, tolerating reasoning
+    ``<think>`` blocks, prose, and code fences. Prefers the last balanced
+    object carrying the expected keys (the answer usually follows any prose)."""
+    text = _THINK_BLOCK.sub("", content or "")
+    expected = {"summary", "interpretation", "confidence", "recommended_next_checks"}
+    last_valid: dict | None = None
+    keyed: dict | None = None
+    for span in _top_level_objects(text):  # answer JSON usually comes last
+        try:
+            parsed = json.loads(span)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            last_valid = parsed
+            if parsed.keys() & expected:
+                keyed = parsed
+    return keyed or last_valid
 
 
 class Agent:
@@ -76,11 +112,16 @@ class Agent:
         self.workspace = workspace
 
     def analyze(self, request: AnalysisRequest) -> AnalysisReport:
-        pack = get_domain(request.domain)
+        from scattering_ai.domains.router import resolve_domain
+
+        domain, routing = resolve_domain(request)
+        pack = get_domain(domain)
         findings = pack.run_diagnostics(request)
         chunks = self._retrieve(request, pack)
 
         observations = [f.message for f in findings]
+        if routing != "explicit":
+            observations.insert(0, f"Auto-routed to the '{domain}' domain: {routing}.")
         warnings = [f.message for f in findings if f.severity != Severity.INFO]
         rules = pack.next_check_rules
         rule_checks = sorted(
@@ -103,6 +144,7 @@ class Agent:
 
         report = AnalysisReport(
             status="ok",
+            domain=domain,
             summary=summary or self._deterministic_summary(findings),
             observations=observations,
             interpretation=interpretation,
@@ -209,9 +251,22 @@ class Agent:
 
         parsed = _parse_llm_json(response.content)
         if parsed is None:
+            # One corrective retry: small local models often wrap the answer in
+            # prose or drop the JSON entirely. Ask again for JSON only, no tools.
+            messages.append(Message(role="assistant", content=response.content))
+            messages.append(Message(
+                role="user",
+                content="Reply with ONLY the JSON object described above — keys "
+                "summary, interpretation, recommended_next_checks, confidence. "
+                "No prose, no code fences, no commentary.",
+            ))
+            retry = self.llm.complete(messages, tools=None)
+            parsed = _parse_llm_json(retry.content)
+        if parsed is None:
             return (
                 "",
-                ["LLM interpretation unavailable: response was not valid JSON."],
+                ["LLM interpretation unavailable: response was not valid JSON "
+                 "after a retry."],
                 [],
                 Confidence.LOW,
                 records,
@@ -231,14 +286,18 @@ class Agent:
 
 
 def analyze(
-    domain: str,
-    question: str,
+    domain: str = "auto",
+    question: str = "",
     data: dict | None = None,
     llm: LLMClient | None = None,
     model_id: str = "",
     **options,
 ) -> AnalysisReport:
-    """One-call public API: build a request, run the agent, return the report."""
+    """One-call public API: build a request, run the agent, return the report.
+
+    ``domain`` defaults to ``"auto"`` — the SDK picks the technique pack from
+    the input (see ``domains.router``). The chosen pack is on ``report.domain``.
+    """
     request = AnalysisRequest(
         domain=domain,
         question=question,
