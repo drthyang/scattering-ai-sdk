@@ -151,10 +151,63 @@ def diagnose_file(path: str) -> list[Finding]:
                     "volume (.nxs) or a saved 2D slice (.npz).", evidence={"path": path})]
 
 
-def run_all(files: list[str]) -> list[Finding]:
+def _slice_figure(s, workspace, note: str) -> list[Finding]:
+    from pathlib import Path
+
+    try:
+        from scattering_ai.tools.plotting import plot_slice
+        from scattering_ai.tools.slices import find_peaks_2d
+
+        peaks = find_peaks_2d(s)
+        saved = plot_slice(s, Path(workspace) / "diffuse_map.png", log=True, peaks=peaks)
+    except ImportError:
+        return []
+    except Exception:
+        return []
+    return [Finding(diagnostic="diffuse_summary_figure", severity=Severity.INFO,
+                    message=f"Log-scale intensity map{note}, sharp peaks marked; "
+                    "diffuse scattering is the structured intensity between them.",
+                    evidence={"figures": [saved]})]
+
+
+def _summary_figure(files: list[str], workspace) -> list[Finding]:
+    """A log-scale map the interpretation can point at: the slice itself, or a
+    representative fine-resolution plane cut from a volume."""
+    if workspace is None:
+        return []
+    from scattering_ai.tools.registry import load_slice
+
+    for path in files:
+        p = Path(path)
+        if p.suffix.lower() == ".npz":
+            try:
+                return _slice_figure(load_slice(path), workspace, "")
+            except Exception:
+                continue
+        if _is_hdf5(p):
+            try:
+                from scattering_ai.tools.volumes import load_volume
+
+                vol = load_volume(path)
+                # integrate over the coarsest axis -> the finest in-plane map
+                widths = [(ax.edges[-1] - ax.edges[0]) / ax.n_bins for ax in vol.axes]
+                axis = int(max(range(len(widths)), key=lambda i: widths[i]))
+                ax = vol.axes[axis]
+                center = float((ax.edges[0] + ax.edges[-1]) / 2)
+                thickness = 3 * widths[axis]
+                s = vol.slice(axis=axis, center=center, thickness=thickness)
+                return _slice_figure(s, workspace,
+                                     f" (integrated over {ax.name}={center:g})")
+            except Exception:
+                continue
+    return []
+
+
+def run_all(files: list[str], workspace=None) -> list[Finding]:
     findings: list[Finding] = []
     for f in files:
         findings.extend(diagnose_file(f))
+    findings.extend(_summary_figure(files, workspace))
     return findings
 
 

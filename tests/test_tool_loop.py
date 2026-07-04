@@ -85,7 +85,7 @@ def test_agent_tool_loop_end_to_end(tmp_path):
     assert report.confidence == Confidence.HIGH
     assert report.used_tools == ["find_peaks_1d", "fit_peaks_1d"]
     assert len(report.provenance.tool_calls) == 2
-    assert report.provenance.prompt_version == "data_analysis/v2"
+    assert report.provenance.prompt_version == "data_analysis/v3"
 
     # tool results actually flowed back into the conversation
     final_messages = llm.transcripts[-1][0]

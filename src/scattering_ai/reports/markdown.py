@@ -41,6 +41,11 @@ def render(report: AnalysisReport, title: str = "Analysis Report") -> str:
         "",
         _bullets(report.recommended_next_checks),
         "",
+        "## Figures",
+        "",
+        "\n".join(f"![{report.domain} figure]({p})" for p in report.figures)
+        if report.figures else "- None.",
+        "",
         "## Knowledge used",
         "",
         _bullets(citations),

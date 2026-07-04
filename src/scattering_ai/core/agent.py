@@ -29,6 +29,9 @@ from scattering_ai.domains.registry import DomainPack, get_domain
 from scattering_ai.llm.base import LLMClient, Message
 from scattering_ai.rag.retriever import KnowledgeBase, RetrievedChunk, default_knowledge_root
 
+# Findings that exist only to attach a figure — kept out of the prose observations.
+_FIGURE_ONLY = {"pdf_summary_figure", "diffuse_summary_figure"}
+
 
 def _rule_key(finding: Finding) -> str:
     trend = finding.evidence.get("trend")
@@ -116,10 +119,18 @@ class Agent:
 
         domain, routing = resolve_domain(request)
         pack = get_domain(domain)
-        findings = pack.run_diagnostics(request)
+        workspace = Path(self.workspace) if self.workspace else _default_workspace()
+        findings = pack.run_diagnostics(request, workspace)
         chunks = self._retrieve(request, pack)
 
-        observations = [f.message for f in findings]
+        figures: list[str] = []
+        for finding in findings:
+            for path in finding.evidence.get("figures", []) or []:
+                if path and path not in figures:
+                    figures.append(path)
+
+        # Figure-generating findings are provenance, not prose for the reader.
+        observations = [f.message for f in findings if f.diagnostic not in _FIGURE_ONLY]
         if routing != "explicit":
             observations.insert(0, f"Auto-routed to the '{domain}' domain: {routing}.")
         warnings = [f.message for f in findings if f.severity != Severity.INFO]
@@ -129,7 +140,7 @@ class Agent:
         )
 
         summary, interpretation, llm_checks, confidence, tool_records = self._interpret(
-            request, pack, findings, chunks
+            request, pack, findings, chunks, figures, workspace
         )
         next_checks = llm_checks + [c for c in rule_checks if c not in llm_checks]
 
@@ -150,6 +161,7 @@ class Agent:
             interpretation=interpretation,
             warnings=warnings,
             recommended_next_checks=next_checks,
+            figures=figures,
             citations=[
                 Citation(source=r.chunk.path, section=r.chunk.section) for r in chunks
             ],
@@ -190,6 +202,8 @@ class Agent:
         pack: DomainPack,
         findings: list[Finding],
         chunks: list[RetrievedChunk],
+        figures: list[str] | None = None,
+        workspace: Path | None = None,
     ) -> tuple[str, list[str], list[str], Confidence, list]:
         """LLM interpretation, optionally with a tool-calling loop.
 
@@ -204,11 +218,20 @@ class Agent:
         knowledge_block = "\n\n".join(
             f"[K{i + 1}] ({r.citation})\n{r.chunk.text}" for i, r in enumerate(chunks)
         )
+        figures_block = ""
+        if figures:
+            listed = "\n".join(f"- {p}" for p in figures)
+            figures_block = (
+                "\n\nSUMMARIZING FIGURES already generated (reference them by "
+                "path in your interpretation as visual support for the "
+                f"conclusion):\n{listed}"
+            )
         user_content = (
             f"QUESTION:\n{request.question}\n\n"
             f"DIAGNOSTICS (deterministic findings with evidence):\n"
             f"{json.dumps([f.model_dump() for f in findings], indent=1)}\n\n"
-            f"KNOWLEDGE:\n{knowledge_block or '(no knowledge retrieved)'}\n\n"
+            f"KNOWLEDGE:\n{knowledge_block or '(no knowledge retrieved)'}"
+            f"{figures_block}\n\n"
             f"RUN DATA (structured input):\n{request.data.model_dump_json()}"
         )
         messages = [
@@ -221,7 +244,7 @@ class Agent:
         if request.options.use_tools and self.llm.capabilities.tool_use:
             from scattering_ai.tools.registry import default_toolkit
 
-            registry = default_toolkit(self.workspace or _default_workspace())
+            registry = default_toolkit(workspace or self.workspace or _default_workspace())
             specs = registry.specs
 
         records: list[ToolCallRecord] = []

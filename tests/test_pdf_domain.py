@@ -107,7 +107,7 @@ def test_missing_and_unreadable_files():
 def test_pdf_pack_registered_with_same_interface():
     pack = get_domain("pdf")
     assert pack.name == "pdf"
-    assert pack.prompt_version == "pdf_interpret/v1"
+    assert pack.prompt_version == "pdf_interpret/v2"
     # next-check rules live on the pack (decision D10), not in core
     assert "pdf_baseline_slope" in pack.next_check_rules
     # rmc rules stayed with their pack through the same move

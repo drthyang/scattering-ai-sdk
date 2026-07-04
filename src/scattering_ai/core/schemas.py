@@ -112,6 +112,7 @@ class AnalysisReport(BaseModel):
     interpretation: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     recommended_next_checks: list[str] = Field(default_factory=list)
+    figures: list[str] = Field(default_factory=list)  # summarizing plot paths
     citations: list[Citation] = Field(default_factory=list)
     used_tools: list[str] = Field(default_factory=list)
     confidence: Confidence = Confidence.LOW

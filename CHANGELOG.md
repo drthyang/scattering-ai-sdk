@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Summarizing figures + phase-transition detection
+- Every report can now carry **summarizing figures** (`report.figures`, rendered
+  in the Markdown report). Domain diagnostics generate a plot that supports the
+  conclusion, the agent attaches the paths, and the LLM is told to reference
+  them in its interpretation:
+  - **data**: detects a temperature/field **series**, tracks the strongest peaks
+    across the whole range, reports any **phase transition** (T_c + which peaks
+    move), and emits a waterfall + per-peak tracking figure. This is the
+    "observe a phase transition" path for a plain scan series (validated on
+    GaNb4Se8 → T_c ≈ 39 K).
+  - **pdf**: G(r)/S(Q) overview plot with peaks marked.
+  - **diffuse**: log-scale intensity map (Bragg peaks marked); for a volume, a
+    representative fine-resolution plane is cut automatically.
+- Pack prompts bumped (`pdf_interpret/v2`, `diffuse_interpret/v2`,
+  `data_analysis/v3`) to reference the figures and, for a series, to read the
+  precomputed transition rather than re-deriving it.
+
 ### Domain auto-routing — one entry point
 - `analyze()` now defaults to `domain="auto"`: the SDK picks the technique pack
   from the input (`domains/router.py`) — RMC run state → `rmc`, a

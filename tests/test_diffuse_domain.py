@@ -81,7 +81,7 @@ def test_is_hdf5_by_suffix_and_magic(tmp_path):
 def test_diffuse_pack_registered():
     pack = get_domain("diffuse")
     assert pack.name == "diffuse"
-    assert pack.prompt_version == "diffuse_interpret/v1"
+    assert pack.prompt_version == "diffuse_interpret/v2"
     assert "contaminant_rings" in pack.next_check_rules
     # four built-in domains now coexist
     from scattering_ai.domains.registry import _BUILTIN

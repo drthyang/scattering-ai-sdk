@@ -192,10 +192,42 @@ def diagnose_file(path: str) -> list[Finding]:
     return check_sq_convention(curve, path) + check_q_range(curve)
 
 
-def run_all(files: list[str]) -> list[Finding]:
+def _summary_figure(files: list[str], workspace) -> list[Finding]:
+    """Overview plot of the first readable curve, peaks marked — the figure the
+    interpretation points at."""
+    if workspace is None:
+        return []
+    for path in files:
+        try:
+            curve = load_curve(path)
+        except Exception:
+            continue
+        try:
+            from pathlib import Path
+
+            from scattering_ai.tools.plotting import plot_curve
+
+            peaks = find_peaks(curve, subtract_background=not is_r_space(curve))
+            out = Path(workspace) / "pdf_overview.png"
+            saved = plot_curve(curve, out, peaks=peaks, logy=not is_r_space(curve))
+        except ImportError:
+            return []
+        except Exception:
+            return []
+        kind = "G(r)" if is_r_space(curve) else "S(Q)/F(Q)"
+        return [Finding(
+            diagnostic="pdf_summary_figure", severity=Severity.INFO,
+            message=f"Overview plot of the {kind} with detected peaks marked.",
+            evidence={"figures": [saved]},
+        )]
+    return []
+
+
+def run_all(files: list[str], workspace=None) -> list[Finding]:
     findings: list[Finding] = []
     for f in files:
         findings.extend(diagnose_file(f))
+    findings.extend(_summary_figure(files, workspace))
     return findings
 
 

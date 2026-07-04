@@ -21,7 +21,10 @@ ENTRY_POINT_GROUP = "scattering_ai.domains"
 class DomainPack:
     name: str
     description: str
-    run_diagnostics: Callable[[AnalysisRequest], list[Finding]]
+    # (request, workspace) -> findings. Findings may carry summarizing plot
+    # paths in ``evidence["figures"]`` when a workspace and matplotlib are
+    # available; the agent harvests them onto the report.
+    run_diagnostics: Callable[..., list[Finding]]
     knowledge_dirs: list[str] = field(default_factory=list)
     prompt_version: str = ""
     system_prompt: str = ""
@@ -36,7 +39,7 @@ def _rmc_pack() -> DomainPack:
     from scattering_ai.domains.rmc.diagnostics import NEXT_CHECK_RULES, run_all
     from scattering_ai.domains.rmc.schemas import RMCRunState
 
-    def run(request: AnalysisRequest) -> list[Finding]:
+    def run(request: AnalysisRequest, workspace=None) -> list[Finding]:
         return run_all(RMCRunState.from_analysis_data(request.data))
 
     return DomainPack(
@@ -51,24 +54,11 @@ def _rmc_pack() -> DomainPack:
 
 
 def _data_pack() -> DomainPack:
-    from pathlib import Path
-
-    from scattering_ai.core.findings import Finding, Severity
     from scattering_ai.domains.data import prompts
+    from scattering_ai.domains.data.diagnostics import NEXT_CHECK_RULES, run_all
 
-    def run(request: AnalysisRequest) -> list[Finding]:
-        findings = []
-        for f in request.data.files:
-            if not Path(f).exists():
-                findings.append(
-                    Finding(
-                        diagnostic="missing_files",
-                        severity=Severity.ERROR,
-                        message=f"Input file not found: {f}",
-                        evidence={"path": f},
-                    )
-                )
-        return findings
+    def run(request: AnalysisRequest, workspace=None) -> list[Finding]:
+        return run_all(request.data.files, workspace=workspace)
 
     return DomainPack(
         name="data",
@@ -77,10 +67,7 @@ def _data_pack() -> DomainPack:
         knowledge_dirs=["scattering"],
         prompt_version=prompts.PROMPT_VERSION,
         system_prompt=prompts.SYSTEM_PROMPT,
-        next_check_rules={
-            "missing_files": "Locate or regenerate the missing files before "
-            "trusting the analysis.",
-        },
+        next_check_rules=NEXT_CHECK_RULES,
     )
 
 
@@ -88,8 +75,8 @@ def _pdf_pack() -> DomainPack:
     from scattering_ai.domains.pdf import prompts
     from scattering_ai.domains.pdf.diagnostics import NEXT_CHECK_RULES, run_all
 
-    def run(request: AnalysisRequest) -> list[Finding]:
-        return run_all(request.data.files)
+    def run(request: AnalysisRequest, workspace=None) -> list[Finding]:
+        return run_all(request.data.files, workspace=workspace)
 
     return DomainPack(
         name="pdf",
@@ -106,8 +93,8 @@ def _diffuse_pack() -> DomainPack:
     from scattering_ai.domains.diffuse import prompts
     from scattering_ai.domains.diffuse.diagnostics import NEXT_CHECK_RULES, run_all
 
-    def run(request: AnalysisRequest) -> list[Finding]:
-        return run_all(request.data.files)
+    def run(request: AnalysisRequest, workspace=None) -> list[Finding]:
+        return run_all(request.data.files, workspace=workspace)
 
     return DomainPack(
         name="diffuse",
