@@ -89,21 +89,24 @@ def _series_transition(files: list[str], workspace) -> list[Finding]:
         evidence={"param_label": label, "params": series.params},
     )]
 
-    peaks = find_peaks(stack_series(series), subtract_background=True)[:N_TRACK]
     detections: list[float] = []
     tracked_all = []
-    for pk in peaks:
-        tracked = track_peak(series, center=pk["x"])
-        good = [r for r in tracked["rows"] if r.get("ok")]
-        if len(good) < 6:
-            continue
-        params = [r["param"] for r in good]
-        det_c = detect_transition(params, [r["center"] for r in good],
-                                  [r["center_err"] for r in good])
-        det_f = detect_transition(params, [r["fwhm"] for r in good],
-                                  [r["fwhm_err"] for r in good])
-        tracked_all.append((pk["x"], tracked, det_c, det_f))
-        detections += [d["transition_param"] for d in (det_c, det_f) if d.get("detected")]
+    try:  # a degenerate/flat curve must not crash the whole analysis
+        peaks = find_peaks(stack_series(series), subtract_background=True)[:N_TRACK]
+        for pk in peaks:
+            tracked = track_peak(series, center=pk["x"])
+            good = [r for r in tracked["rows"] if r.get("ok")]
+            if len(good) < 6:
+                continue
+            params = [r["param"] for r in good]
+            det_c = detect_transition(params, [r["center"] for r in good],
+                                      [r["center_err"] for r in good])
+            det_f = detect_transition(params, [r["fwhm"] for r in good],
+                                      [r["fwhm_err"] for r in good])
+            tracked_all.append((pk["x"], tracked, det_c, det_f))
+            detections += [d["transition_param"] for d in (det_c, det_f) if d.get("detected")]
+    except Exception:
+        return findings  # keep the series_detected finding; skip the scan
 
     figures = _series_figures(series, tracked_all, workspace)
     if detections:

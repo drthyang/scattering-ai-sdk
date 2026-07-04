@@ -113,10 +113,11 @@ def auto_mask_value(curves: list[Curve1D]) -> float | None:
         return None
     low_tail = float(np.percentile(finite, 2.0))
     min_count = max(10, int(0.01 * finite.size))
+    max_count = 0.4 * finite.size  # a sentinel flags a minority; not the bulk
     values, counts = np.unique(finite, return_counts=True)
     best: tuple[int, float] | None = None
     for value, count in zip(values, counts, strict=True):
-        if value > low_tail or count < min_count:
+        if value > low_tail or not (min_count <= count <= max_count):
             continue
         n_curves = sum(1 for arr in arrays if np.any(arr == value))
         if n_curves < max(2, len(arrays) // 2):

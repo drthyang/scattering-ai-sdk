@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Docs + entry-point consistency
+- New [QUICKSTART.md](QUICKSTART.md): setup, the simplest agent-skills example,
+  and advanced usage (LLM, chat, other interfaces, writing your own skill).
+  README trimmed with a docs header.
+- `analyze(data={"files": [...]})` now expands **globs and directories** just like
+  the CLI (shared `core.files.expand_files`), so a folder or `"scans/*.dat"` runs
+  a whole series through the Python API.
+- Robustness: `auto_mask_value` no longer treats a value that dominates the data
+  (flat/degenerate curves) as a mask sentinel, and the series transition scan is
+  guarded so an odd curve can never crash `analyze()`.
+
 ### Summarizing figures + phase-transition detection
 - Every report can now carry **summarizing figures** (`report.figures`, rendered
   in the Markdown report). Domain diagnostics generate a plot that supports the

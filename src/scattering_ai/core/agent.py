@@ -115,8 +115,13 @@ class Agent:
         self.workspace = workspace
 
     def analyze(self, request: AnalysisRequest) -> AnalysisReport:
+        from scattering_ai.core.files import expand_files
         from scattering_ai.domains.router import resolve_domain
 
+        # Globs/directories in `files` become concrete paths so a series or a
+        # folder "just works" through the Python API too, matching the CLI.
+        if request.data.files:
+            request.data.files = expand_files(request.data.files)
         domain, routing = resolve_domain(request)
         pack = get_domain(domain)
         workspace = Path(self.workspace) if self.workspace else _default_workspace()

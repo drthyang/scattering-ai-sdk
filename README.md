@@ -15,7 +15,8 @@ fully offline with local models.
 
 > Status: **early, but useful.** Four domain packs, auto-routing, figure-backed
 > reports, and an evaluation harness are in place and validated on real data.
-> See [ROADMAP.md](ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md).
+
+**Docs:** [Quickstart](QUICKSTART.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
 
 ## What it can tell you
 
@@ -97,8 +98,10 @@ from scattering_ai.connectors.rmc_monitor import analyze_monitor   # apps own ze
 report = analyze_monitor(monitor_json)
 ```
 
-**Skills** — validated multi-step workflows the agent invokes as one call:
-`skill_scan_series_transitions`, `skill_characterize_slice`, `skill_fit_pattern_peaks`.
+**Skills** — validated multi-step workflows the agent invokes as one call
+(`skill_scan_series_transitions`, `skill_characterize_slice`,
+`skill_fit_pattern_peaks`); each returns a summary, `figures`, and an audited
+step chain. See the [Quickstart](QUICKSTART.md#agent-skills).
 
 ## How it works
 

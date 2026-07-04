@@ -18,27 +18,13 @@ from scattering_ai.core.schemas import AnalysisRequest
 
 
 def _expand_files(entries: list[str]) -> list[str]:
-    """Expand glob patterns and directories so ``--file 'scan_*K.dat'`` or
-    ``--file series_dir`` work for a whole series, not just single paths."""
-    import glob as globlib
-    from pathlib import Path
+    """CLI wrapper over the shared expander: fail loudly on an empty glob."""
+    from scattering_ai.core.files import expand_files
 
-    expanded: list[str] = []
     for entry in entries:
-        if any(ch in entry for ch in "*?["):
-            matches = sorted(globlib.glob(entry))
-            if not matches:
-                sys.exit(f"error: glob matched no files: {entry}")
-            expanded += matches
-        elif Path(entry).is_dir():
-            expanded += sorted(
-                str(f) for f in Path(entry).iterdir()
-                if f.is_file() and not f.name.startswith(".")
-                and f.suffix.lower() not in (".md", ".png")
-            )
-        else:
-            expanded.append(entry)
-    return list(dict.fromkeys(expanded))  # dedup, preserve order
+        if any(ch in entry for ch in "*?[") and not expand_files([entry]):
+            sys.exit(f"error: glob matched no files: {entry}")
+    return expand_files(entries)
 
 
 def _build_request(args: argparse.Namespace) -> AnalysisRequest:

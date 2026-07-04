@@ -58,6 +58,23 @@ def test_no_input_falls_back_to_data():
     assert detect_domain(_req([]))[0] == "data"
 
 
+def test_analyze_expands_directory_like_the_cli(tmp_path):
+    """A directory or glob in files is expanded by the Python API, not only the
+    CLI, so analyze(data={'files': [dir]}) runs a whole series."""
+    from scattering_ai import analyze
+    from scattering_ai.core.files import expand_files
+
+    for t in (5.0, 10.0, 15.0, 20.0):
+        (tmp_path / f"scan_T_base_{t:.1f}K.dat").write_text(
+            "\n".join(f"{x} {1.0}" for x in range(50)))
+    (tmp_path / "notes.md").write_text("skip")
+    assert len(expand_files([str(tmp_path)])) == 4  # .md excluded
+    assert len(expand_files([str(tmp_path / "*.dat")])) == 4
+
+    report = analyze(data={"files": [str(tmp_path)]})
+    assert report.domain == "data"  # a folder of scans routed and analysed
+
+
 def test_resolve_respects_explicit_domain():
     assert resolve_domain(AnalysisRequest(domain="pdf", question="?"))[0] == "pdf"
     assert resolve_domain(AnalysisRequest(domain="auto", question="?"))[0] == "data"
