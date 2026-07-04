@@ -104,6 +104,9 @@ def test_scan_series_transitions_skill_real(registry):
     assert 30 <= verdict["transition_estimate"] <= 55
     assert Path(result["plots"]["waterfall"]).exists()
     assert any(p.get("plot") for p in result["tracked_peaks"])
+    # every plot the skill made is aggregated into a single figures list
+    assert result["figures"] and all(p.endswith(".png") for p in result["figures"])
+    assert result["plots"]["waterfall"] in result["figures"]
     # a human-readable summary and per-peak monitoring are always present
     assert str(verdict["transition_estimate"]).split(".")[0] in result["summary"]
     monitored = [p["monitored"] for p in result["tracked_peaks"] if "monitored" in p]
