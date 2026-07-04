@@ -64,6 +64,125 @@ def lattice_from_cif(path: str | Path) -> Lattice:
                    alpha=cell["alpha"], beta=cell["beta"], gamma=cell["gamma"])
 
 
+def _split_cif(tokens_line: str) -> list[str]:
+    """Quote-aware split of one CIF data line (values may be 'quoted strings')."""
+    out, i, n = [], 0, len(tokens_line)
+    while i < n:
+        while i < n and tokens_line[i].isspace():
+            i += 1
+        if i >= n:
+            break
+        if tokens_line[i] in "'\"":
+            quote = tokens_line[i]
+            j = tokens_line.find(quote, i + 1)
+            j = n if j == -1 else j
+            out.append(tokens_line[i + 1:j])
+            i = j + 1
+        else:
+            j = i
+            while j < n and not tokens_line[j].isspace():
+                j += 1
+            out.append(tokens_line[i:j])
+            i = j
+    return out
+
+
+def _iter_loops(lines: list[str]):
+    """Yield (headers, rows) for each ``loop_`` block; rows are token lists."""
+    i, n = 0, len(lines)
+    while i < n:
+        if lines[i].strip() != "loop_":
+            i += 1
+            continue
+        i += 1
+        headers = []
+        while i < n and lines[i].strip().startswith("_"):
+            headers.append(lines[i].strip().lower())
+            i += 1
+        rows = []
+        while i < n:
+            line = lines[i].strip()
+            if not line or line.startswith(("_", "loop_", "data_", "#")):
+                break
+            rows.append(_split_cif(line))
+            i += 1
+        yield headers, rows
+
+
+def _apply_symop(op: str, xyz: np.ndarray) -> np.ndarray:
+    """Evaluate a CIF symmetry-operation string (e.g. '-x,1/2+y,z') at ``xyz``."""
+    x, y, z = xyz
+    out = []
+    for part in op.split(","):
+        expr = part.strip().lower().replace(" ", "")
+        expr = re.sub(r"(\d)/(\d)", r"(\1/\2)", expr)          # 1/2 -> (1/2)
+        expr = re.sub(r"(?<![\d.])x", "*X", expr).replace("*X", f"*({x})")
+        expr = re.sub(r"(?<![\d.])y", "*Y", expr).replace("*Y", f"*({y})")
+        expr = re.sub(r"(?<![\d.])z", "*Z", expr).replace("*Z", f"*({z})")
+        expr = expr.lstrip("*").replace("+*", "+").replace("-*", "-")
+        out.append(eval(expr, {"__builtins__": {}}))          # noqa: S307 - constrained arithmetic
+    return np.mod(np.array(out, dtype=float), 1.0)
+
+
+def read_structure(path: str | Path) -> dict:
+    """Read a full structure from a CIF: cell + all atoms (asymmetric unit
+    expanded by the symmetry operations if the CIF lists them).
+
+    Returns ``lattice`` (a,b,c,alpha,beta,gamma), ``positions`` (fractional),
+    ``species``, and provenance counts. Ready to feed the symmetry tools.
+    """
+    lines = Path(path).read_text(errors="replace").splitlines()
+    cell = read_cif(path)
+    lattice = [cell[k] for k in ("a", "b", "c", "alpha", "beta", "gamma")]
+
+    asym_pos, asym_species, symops = [], [], []
+    for headers, rows in _iter_loops(lines):
+        if any(h.startswith("_atom_site_fract_x") for h in headers):
+            cx = headers.index("_atom_site_fract_x")
+            cy = headers.index("_atom_site_fract_y")
+            cz = headers.index("_atom_site_fract_z")
+            csym = next((headers.index(h) for h in
+                         ("_atom_site_type_symbol", "_atom_site_label") if h in headers), None)
+            for r in rows:
+                if len(r) <= max(cx, cy, cz):
+                    continue
+                asym_pos.append([_strip_su(r[cx]), _strip_su(r[cy]), _strip_su(r[cz])])
+                raw = r[csym] if csym is not None else "X"
+                asym_species.append(re.sub(r"[\d+\-].*$", "", raw) or raw)
+        xyz_col = next((h for h in headers
+                        if h.endswith("_xyz") or h.endswith("_as_xyz")), None)
+        if xyz_col:
+            c = headers.index(xyz_col)
+            symops += [r[c] for r in rows if len(r) > c and "," in r[c]]
+
+    if not asym_pos:
+        raise ValueError(f"No atom sites found in {path}")
+
+    ops = symops or ["x,y,z"]
+    positions, species = [], []
+    for base, sp in zip(asym_pos, asym_species, strict=True):
+        base = np.array(base, dtype=float)
+        for op in ops:
+            p = _apply_symop(op, base)
+            if not any(np.allclose(p, q, atol=1e-4) for q in positions):
+                positions.append(p)
+                species.append(sp)
+    return {
+        "lattice": lattice,
+        "positions": [list(p) for p in positions],
+        "species": species,
+        "space_group_cif": cell.get("space_group", ""),
+        "n_asymmetric": len(asym_pos),
+        "n_atoms": len(positions),
+        "n_symops": len(ops),
+    }
+
+
+def _strip_su(value: str) -> float:
+    match = _NUMBER.match(value.strip())
+    return float(match.group(1)) if match else float(value)
+
+
 def predicted_d_spacings(lattice: Lattice, d_min: float = 1.0,
                          max_index: int = 8, top: int = 30) -> list[dict]:
     """Geometrically allowed d-spacings (no structure factors — a checklist

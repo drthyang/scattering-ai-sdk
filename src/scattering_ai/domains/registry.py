@@ -107,11 +107,31 @@ def _diffuse_pack() -> DomainPack:
     )
 
 
+def _symmetry_pack() -> DomainPack:
+    from scattering_ai.domains.symmetry import prompts
+    from scattering_ai.domains.symmetry.diagnostics import NEXT_CHECK_RULES, run_all
+
+    def run(request: AnalysisRequest, workspace=None) -> list[Finding]:
+        return run_all(request.data.files, workspace=workspace)
+
+    return DomainPack(
+        name="symmetry",
+        description="Crystallographic symmetry: space group, Wyckoff sites, "
+        "maximal subgroups (phase-transition pathways), pseudosymmetry, magnetic",
+        run_diagnostics=run,
+        knowledge_dirs=["scattering"],
+        prompt_version=prompts.PROMPT_VERSION,
+        system_prompt=prompts.SYSTEM_PROMPT,
+        next_check_rules=NEXT_CHECK_RULES,
+    )
+
+
 _BUILTIN: dict[str, Callable[[], DomainPack]] = {
     "rmc": _rmc_pack,
     "data": _data_pack,
     "pdf": _pdf_pack,
     "diffuse": _diffuse_pack,
+    "symmetry": _symmetry_pack,
 }
 
 

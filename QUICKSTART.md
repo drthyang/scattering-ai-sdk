@@ -74,6 +74,15 @@ Three are built in:
 | `skill_fit_pattern_peaks` | Fit the peaks (with uncertainties) | fit + residual |
 | `skill_characterize_slice` | What's in this 2D slice? | slice map + ring profile |
 
+Individual tools are called the same way — e.g. crystallographic symmetry from a
+CIF (needs the `symmetry` extra):
+
+```python
+registry.execute("find_symmetry", {"path": "structure.cif"})      # -> Pm-3m (#221), Wyckoff sites
+tree = registry.execute("subgroup_tree", {"path": "structure.cif"})  # phase-transition pathways
+print([s["international"] for s in tree["subgroups"]], tree["plot"])  # + a subgroup-tree figure
+```
+
 ### Simplest skill call
 
 Skills run over a tool **registry** bound to a workspace folder (where plots and

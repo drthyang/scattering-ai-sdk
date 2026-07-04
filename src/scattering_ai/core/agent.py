@@ -125,6 +125,7 @@ class Agent:
         domain, routing = resolve_domain(request)
         pack = get_domain(domain)
         workspace = Path(self.workspace) if self.workspace else _default_workspace()
+        workspace.mkdir(parents=True, exist_ok=True)  # packs write figures here
         findings = pack.run_diagnostics(request, workspace)
         chunks = self._retrieve(request, pack)
 

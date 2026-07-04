@@ -25,6 +25,7 @@ fully offline with local models.
 | A **T/field scan** of patterns | Whether there's a **phase transition**, its T_c, and which peaks move | waterfall + peak tracking |
 | A **G(r) / S(Q)** curve | Non-standard/inverted G(r), low-r artifacts, first-neighbour distance, S(Q) vs S(Q)−1 | overview plot |
 | A **diffuse volume / slice** | Bragg-vs-diffuse character, contaminant powder rings, Bragg-punch coverage, sampling anisotropy | log-scale map |
+| A **crystal structure (CIF)** | Space group + Wyckoff sites, **maximal subgroups** (phase-transition pathways), pseudosymmetric parent, magnetic space group | subgroup tree |
 | **RMC monitor state** | Convergence trend, Bragg/PDF & neutron/x-ray conflicts, missing files | — |
 
 ## Install
@@ -34,7 +35,8 @@ pip install -e ".[dev]"    # development
 pip install -e ".[all]"    # + LLM client, figures (matplotlib), volumes (h5py), API, MCP
 ```
 
-Python ≥ 3.10. Figures need the `plots` extra (matplotlib); volumes need `volumes` (h5py).
+Python ≥ 3.10. Figures need the `plots` extra (matplotlib); volumes need `volumes`
+(h5py); symmetry needs `symmetry` (spglib).
 
 ## Quick start
 
@@ -78,6 +80,7 @@ Auto-detected from the input, or set explicitly (`--domain` / `domain=`):
 - **`data`** — generic tool-driven analysis; detects a parametric series and hunts phase transitions.
 - **`pdf`** — total scattering: G(r), S(Q), F(Q).
 - **`diffuse`** — single-crystal diffuse scattering / 3D-ΔPDF (volumes and slices).
+- **`symmetry`** — crystallographic symmetry from a CIF: space group, Wyckoff sites, maximal subgroups, pseudosymmetry, magnetic groups ([`symmetry`] extra, spglib).
 - **`rmc`** — RMCProfile run health.
 
 Each pack is self-contained (diagnostics + knowledge + prompt + next-check rules

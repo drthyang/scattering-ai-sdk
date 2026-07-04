@@ -41,6 +41,7 @@ Decisions are recorded here so future contributors see *why*, and so any of them
 | D10 | Domain-owned next-check rules | The deterministic "what to check next" rules for a technique are domain content, not core logic; they live on the `DomainPack`, not in `core/agent.py`. Surfaced while building the first technique pack (B4): keeps the "no core reasoning changes per new pack" invariant honest and testable | Accepted (2026-07) |
 | D11 | First technique pack = PDF / total scattering | Chosen over phonons/diffuse for the first B4 pack because the tools (S(Q)→G(r), peak fitting, series) and validated real data (FeCoSn, GaTa4Se8) already exist, and it directly feeds the RMC workflow. Encodes the user's known real-data gotchas (inverted-.gr sign, NOMAD S(Q)−1 naming) as deterministic diagnostics | Accepted (2026-07) |
 | D12 | Phonons belong to an inelastic-neutron-scattering (INS) domain | Phonon analysis is one capability of INS (S(Q,ω), dispersions, DOS, dynamic structure factor), not a standalone technique. The future pack is `ins` (energy-resolved scattering), with phonon skills inside it — not a `phonons` pack. Keeps the domain axis = measurement technique, consistent with `pdf`/`diffuse` | Accepted (2026-07) |
+| D13 | Symmetry pack built on spglib (`[symmetry]` extra) | Crystallography is correctness-critical; spglib is the field-standard, well-tested engine (space groups, Wyckoff, magnetic). Subgroup trees are computed from spglib's operations (general maximal-subgroup enumeration in the primitive setting, typed via `get_spacegroup_type_from_symmetry`), verified against International Tables. Avoids re-implementing crystallographic databases | Accepted (2026-07) |
 
 ---
 
@@ -368,12 +369,23 @@ Track D — Trust & Quality     D1 diagnostics → D2 reports → D3 evaluation 
   Bragg-vs-diffuse character; knowledge on diffuse scattering and 3D-ΔPDF.
   Validated on the real CORELLI TbTi3Bi4 volume (flags its 4.5× anisotropic
   sampling and a Cu ring candidate).
+- **Third pack — symmetry (done, spglib per D13):** the `symmetry` domain
+  analyses a crystal structure (CIF). Tools: `find_symmetry` (FINDSYM-like space
+  group + Wyckoff), `subgroup_tree` (maximal subgroups = phase-transition
+  pathways, with domain-variant counts and a tree figure), `pseudosymmetry_scan`
+  (parent-phase search), `magnetic_symmetry` (Shubnikov group from moments).
+  Verified against the International Tables (Pm-3m subgroups).
+  - *Additional symmetry tools worth adding later:* systematic-absence /
+    reflection-condition prediction (ties symmetry to the diffraction/pdf packs),
+    cell standardization, klassengleiche (cell-multiplying) subgroups for
+    ordering transitions, symmetry-mode / irrep decomposition (AMPLIMODES-style),
+    and k-vector → maximal magnetic space group representation analysis (MAXMAGN).
+    These need extra tables or representation machinery beyond spglib.
 - **Later candidate packs (order by user need):**
   - **INS (inelastic neutron scattering, incl. phonons — per D12):** S(Q,ω),
     dispersions, DOS features, flat/soft branches, acoustic-mode checks, dynamic
     structure factor; phonon analysis is a capability *inside* this pack, not a
     standalone `phonons` pack.
-  - **Symmetry:** symmetry checks, space-group comparison, irrep constraints, allowed tensor components.
 - **Definition of Done:** a user question routes to the correct domain pack and knowledge base; adding the pack required **no changes to core reasoning** (agent loop, schemas, tool layer, report generator) — only a new pack module, its registration, and its knowledge/eval assets. If core needs a change (as D10 did), make it a general one and fix it before the next pack.
 
 ---
@@ -519,7 +531,7 @@ tagged and the repo is pushed. What exists now:
 | Track | Done | Notes |
 |-------|------|-------|
 | A — Core Runtime | A0, A1, **A2 (full tool dispatch)** | A3 multi-agent still deferred |
-| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` technique packs)** | plugin architecture proven twice with no core reasoning changes; next pack `ins` |
+| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` technique packs)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus/CIF adapters) | all surfaces wrap the same core |
 | D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)** | reports carry figures the LLM reasons over; incomplete-provenance reports are rejected; D5 later |
 
@@ -545,10 +557,11 @@ The old bottom-up tool ladder is **done**. The next frontier is proving the
 **plugin architecture with a real technique pack** (Track B4) and hardening
 trust (D4), not more one-off tools.
 
-Done recently: B4 `pdf` + `diffuse` packs; D10 next-check-rules move; D4
-provenance enforcement; domain **auto-routing** (one entry point); LLM-loop
-hardening (reasoning-block/prose-tolerant JSON + retry); **summarizing figures**
-in reports with first-class **phase-transition** detection in the `data` pack.
+Done recently: B4 `pdf` + `diffuse` + `symmetry` packs; D10 next-check-rules
+move; D4 provenance enforcement; domain **auto-routing** (one entry point);
+LLM-loop hardening (reasoning-block/prose-tolerant JSON + retry); **summarizing
+figures** in reports with first-class **phase-transition** detection (`data`
+pack) and **maximal-subgroup trees** (`symmetry` pack).
 
 ```text
 Next:

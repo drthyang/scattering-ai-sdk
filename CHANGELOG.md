@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Symmetry domain pack (B4 — third technique pack)
+- New `symmetry` domain (spglib-backed, `[symmetry]` extra) for crystal
+  structures (CIF), auto-routed from `.cif`/`.mcif`:
+  - **`find_symmetry`** — FINDSYM-like: space group (number/symbol/Hall), point
+    group, crystal system, and Wyckoff sites at a chosen tolerance.
+  - **`subgroup_tree`** — the **maximal subgroups** of the space group: the
+    group-subgroup pathways a structural phase transition can take, with index
+    and number of domain variants, drawn as a tree figure. Verified against the
+    International Tables (Pm-3m → P4/mmm i3×3, R-3m i4×4, P432/P-43m/Pm-3 i2).
+  - **`pseudosymmetry_scan`** — relax the tolerance to find a higher-symmetry
+    parent phase a distorted structure sits under.
+  - **`magnetic_symmetry`** — the magnetic (Shubnikov) space group of an ordered
+    magnetic structure from its moments.
+  - CIF reader gained `read_structure` (atom-site loop + symmetry-operation
+    expansion of the asymmetric unit), a versioned prompt `symmetry_interpret/v1`,
+    and a group-subgroup / phase-transition knowledge file.
+- Scope: translationengleiche subgroups (cell-multiplying klassengleiche and
+  k-vector→maximal-magnetic-group representation analysis are future work).
+- The agent now ensures the report workspace exists before packs write figures.
+
 ### Docs + entry-point consistency
 - New [QUICKSTART.md](QUICKSTART.md): setup, the simplest agent-skills example,
   and advanced usage (LLM, chat, other interfaces, writing your own skill).

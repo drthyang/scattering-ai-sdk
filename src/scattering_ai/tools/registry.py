@@ -338,6 +338,43 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                             param_label=series.param_label, xmin=xmin, xmax=xmax)
         return {"saved": saved, "summary": series.summary()}
 
+    def _structure(path: str):
+        from scattering_ai.tools.cif import read_structure
+
+        s = read_structure(path)
+        return s["lattice"], s["positions"], s["species"]
+
+    def find_symmetry(path: str, symprec: float = 1e-3) -> dict:
+        from scattering_ai.tools import symmetry as sym
+
+        lat, pos, sp = _structure(path)
+        return sym.find_symmetry(lat, pos, sp, symprec=symprec)
+
+    def subgroup_tree(path: str, symprec: float = 1e-3) -> dict:
+        from scattering_ai.tools import symmetry as sym
+
+        lat, pos, sp = _structure(path)
+        result = sym.maximal_subgroups(lat, pos, sp, symprec=symprec)
+        if "error" not in result:
+            try:
+                result["plot"] = sym.subgroup_tree_figure(
+                    result, artifact("subgroup_tree", ".png"))
+            except ImportError:
+                pass
+        return result
+
+    def pseudosymmetry_scan(path: str) -> dict:
+        from scattering_ai.tools import symmetry as sym
+
+        lat, pos, sp = _structure(path)
+        return sym.pseudosymmetry_scan(lat, pos, sp)
+
+    def magnetic_symmetry(path: str, magmoms: list[float]) -> dict:
+        from scattering_ai.tools import symmetry as sym
+
+        lat, pos, sp = _structure(path)
+        return sym.magnetic_symmetry(lat, pos, sp, magmoms)
+
     number = {"type": "number"}
     opt_number = {"type": ["number", "null"]}
     string = {"type": "string"}
@@ -526,6 +563,41 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                     ["paths"],
                 ),
                 plot_series_files,
+            ),
+            AgentTool(
+                "find_symmetry",
+                "Detect the space group of a crystal structure (CIF) at a given "
+                "tolerance: number, symbol, point group, crystal system, and "
+                "Wyckoff sites (FINDSYM-like). Needs the [symmetry] extra.",
+                _params({"path": string, "symprec": number}, ["path"]),
+                find_symmetry,
+            ),
+            AgentTool(
+                "subgroup_tree",
+                "List the maximal subgroups of a structure's space group — the "
+                "group-subgroup pathways a structural phase transition can take "
+                "(type, index, number of domain variants) — and draw the tree.",
+                _params({"path": string, "symprec": number}, ["path"]),
+                subgroup_tree,
+            ),
+            AgentTool(
+                "pseudosymmetry_scan",
+                "Relax the position tolerance to find a higher-symmetry parent "
+                "phase a slightly distorted structure sits under (the "
+                "pseudosymmetry a transition breaks).",
+                _params({"path": string}, ["path"]),
+                pseudosymmetry_scan,
+            ),
+            AgentTool(
+                "magnetic_symmetry",
+                "Determine the magnetic (Shubnikov) space group of an ordered "
+                "magnetic structure: pass the CIF and one collinear moment per "
+                "atom (or an N x 3 list of moment vectors).",
+                _params(
+                    {"path": string, "magmoms": {"type": "array", "items": number}},
+                    ["path", "magmoms"],
+                ),
+                magnetic_symmetry,
             ),
         ]
     )

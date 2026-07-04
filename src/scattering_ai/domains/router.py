@@ -16,6 +16,7 @@ from pathlib import Path
 from scattering_ai.core.schemas import AnalysisRequest
 
 AUTO = "auto"
+_SYMMETRY_SUFFIXES = {".cif", ".mcif"}
 _PDF_SUFFIXES = {".gr", ".fq", ".sq"}
 _SLICE_SUFFIXES = {".npz"}
 _VOLUME_SUFFIXES = {".nxs", ".h5", ".hdf5", ".nx5", ".nexus"}
@@ -62,6 +63,9 @@ def detect_domain(request: AnalysisRequest) -> tuple[str, str]:
         return "rmc", "structured RMC run state (run_summary / r_values / metadata.rmc)"
 
     files = [Path(f) for f in data.files]
+    for p in files:
+        if p.suffix.lower() in _SYMMETRY_SUFFIXES:
+            return "symmetry", f"crystal structure ({p.name})"
     for p in files:
         if _is_hdf5(p) or p.suffix.lower() in _SLICE_SUFFIXES:
             return "diffuse", f"reciprocal-space volume/slice ({p.name})"

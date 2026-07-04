@@ -33,8 +33,9 @@ volumes = ["h5py>=3.8"]
 mcp = ["mcp>=1.0"]
 api = ["fastapi>=0.110", "uvicorn>=0.29"]
 plots = ["matplotlib>=3.8"]
-all = ["scattering-ai-sdk[llm,volumes,mcp,api,plots]"]
-dev = ["pytest>=8.0", "ruff>=0.4", "httpx>=0.27"]
+symmetry = ["spglib>=2.5"]
+all = ["scattering-ai-sdk[llm,volumes,mcp,api,plots,symmetry]"]
+dev = ["pytest>=8.0", "ruff>=0.4", "httpx>=0.27", "spglib>=2.5"]
 
 [project.urls]
 Repository = "https://github.com/thyang/scattering-ai-sdk"
@@ -53,6 +54,11 @@ packages = ["src/scattering_ai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # third-party deprecations we don't control
+    "ignore::DeprecationWarning:spglib.*",
+    "ignore::DeprecationWarning:starlette.*",
+]
 
 [tool.ruff]
 line-length = 100
