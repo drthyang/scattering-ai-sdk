@@ -690,7 +690,7 @@ has begun improving through its own use. What exists now:
 | B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` packs; PDF model fitting, OPTIMADE lookup, mPDF, magnetic-diffuse tools)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` (data-gated, E8) |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus / CIF / mCIF / RMCProfile `.rmc6f` readers) | all surfaces wrap the same core |
 | D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)**, **D6 started (symlink-escape fix)** | incomplete-provenance reports rejected; adversarial hardening begun; D5 later |
-| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; E6–E9 next |
+| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop), E6 (capture chat + MCP), E7 (agent briefs), E8 (data-gated watch queue), E9 (knowledge growth)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; remaining wiring: E7 one-command hand-off, E9 retrieval, E6 reformulation |
 
 Built beyond the original slice: a broad agent-tool registry + composite skills
 organized by category (patterns / series / slices / structure), CIF/mCIF
@@ -722,7 +722,9 @@ Since 2026-07-03: PDF **model fitting** (`simulate_gr` + `fit_gr_model`),
 ΔPDF punch-and-fill). The **growth loop (Track E, E1–E5)** shipped: an opt-in
 redacted journal, deterministic signals + human corrections, tiered proposals,
 and a guarded apply with an eval gate — plus its first adversarial fix (D6,
-symlink escape, from a Codex-delegated review). **260 tests.**
+symlink escape, from a Codex-delegated review). Track E completed E6–E9
+(capture chat + MCP failures, agent briefs, data-gated watch queue, knowledge
+growth) and D5's case-study harness landed. **277 tests.**
 
 ## Immediate Next Actions
 
@@ -755,26 +757,21 @@ and (b) the unblocked, publication-feeding work — not more one-off tools.
 ```text
 Done (2026-07): 1. PDF model comparison (simulate_gr_from_cif + fit_gr_model).
                 2. OPTIMADE structure lookup.  3. mPDF.
-                Magnetic-diffuse T1/T2/S1/S2/S3.  Growth loop E1–E5.
-                D6 first fix (symlink-escape hardening).
+                Magnetic-diffuse T1/T2/S1/S2/S3.
+                Growth loop E1–E9 (capture-everywhere, briefs, watch queue,
+                knowledge growth).  D5 case-study harness.  D6 symlink fix.
 
 Next (impact-ordered):
-1.  E6 — capture everywhere: journal chat turns, tool failures, and MCP/connector
-    calls (same redaction), so more of real use becomes signal. Small, unblocks
-    the rest of Track E, and needs no new data.
-2.  D5 groundwork — reproducible case-study runs (phase transition, inverted-.gr,
-    diffuse contaminant/anisotropy, RMC convergence). Unblocked on existing data;
-    feeds the publication AND becomes pinned regression evals via the loop.
-3.  E7 — agent-executed improvement briefs: turn a reproduced failure cluster
-    into a self-contained brief a coding agent (Codex/Claude Code) implements on
-    an isolated branch for human review. This is the "self-implement" capability.
-4.  T3 — Spinvert-style RMC spin refinement (fit a spin config to measured
-    magnetic diffuse I(Q)); gated on reference data to validate against.
-5.  E8 — data-gated capability queue: when S(Q,ω) data lands, the loop scaffolds
-    the `ins` pack (phonons per D12; home for rmc-phonon k-path utils) + eval
-    placeholders and opens a brief. Same mechanism unblocks symmetry rep-theory.
-6.  Chat polish: surface figures inline; optional streaming.
-7.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
+1.  Data-gated builds, now self-flagged by the E8 watch queue: `ins` pack
+    (S(Q,ω) / phonons per D12) and T3 Spinvert spin refinement — drop the data
+    in data/, run `learn watch --brief`, hand the brief to a coding agent.
+2.  Close the E-track wiring: E7 one-command agent hand-off (launch Codex/Claude
+    Code on the branch), E9 retrieval of applied knowledge/learned/ snippets,
+    E6 cross-turn "repeated reformulation" detection.
+3.  Symmetry rep-theory (klassengleiche subgroups, irrep/mode decomposition,
+    MAXMAGN) — gated on representation-theory tables.
+4.  Chat polish: surface figures inline; optional streaming.
+5.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
 
 ### Community-informed candidates (survey, 2026-07)
