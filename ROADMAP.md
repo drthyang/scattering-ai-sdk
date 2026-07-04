@@ -42,6 +42,8 @@ Decisions are recorded here so future contributors see *why*, and so any of them
 | D11 | First technique pack = PDF / total scattering | Chosen over phonons/diffuse for the first B4 pack because the tools (S(Q)→G(r), peak fitting, series) and validated real data (FeCoSn, GaTa4Se8) already exist, and it directly feeds the RMC workflow. Encodes the user's known real-data gotchas (inverted-.gr sign, NOMAD S(Q)−1 naming) as deterministic diagnostics | Accepted (2026-07) |
 | D12 | Phonons belong to an inelastic-neutron-scattering (INS) domain | Phonon analysis is one capability of INS (S(Q,ω), dispersions, DOS, dynamic structure factor), not a standalone technique. The future pack is `ins` (energy-resolved scattering), with phonon skills inside it — not a `phonons` pack. Keeps the domain axis = measurement technique, consistent with `pdf`/`diffuse` | Accepted (2026-07) |
 | D13 | Symmetry pack built on spglib (`[symmetry]` extra) | Crystallography is correctness-critical; spglib is the field-standard, well-tested engine (space groups, Wyckoff, magnetic). Subgroup trees are computed from spglib's operations (general maximal-subgroup enumeration in the primitive setting, typed via `get_spacegroup_type_from_symmetry`), verified against International Tables. Avoids re-implementing crystallographic databases | Accepted (2026-07) |
+| D14 | Growth loop as a design axis: capability is data-gated and lands incrementally during real use | The known-answer rule (B3) means the SDK cannot be built from a finished spec — datasets, known answers, corrections, and failure modes arrive over months of research. The self-improvement loop (journal → signals → proposals → guarded apply; Track E, `docs/self_improvement.md`) is the standing mechanism that converts everyday use into capability, so the agent grows with the researcher instead of waiting on a complete build | Accepted (2026-07) |
+| D15 | Self-implementation is agent-drafted, human-gated | The loop may auto-land Tier-0 *data* behind the eval gate, and may package recurring-failure evidence into executable briefs for coding agents (Claude Code / Codex) on isolated branches — but scientific logic, schemas, and core code change only through human-reviewed, eval-gated diffs. Self-implement extends the tier system; it never weakens it | Accepted (2026-07) |
 
 ---
 
@@ -66,6 +68,7 @@ scattering_ai SDK
         |-- Rule-Based Diagnostics    (deterministic, runs before the LLM)
         |-- Report Generator          (Markdown + JSON, with provenance)
         |-- Evaluation Suite          (domain behavior regression tests)
+        |-- Growth Loop               (journal → signals → proposals → guarded apply; human-approved)
         |
         v
 LLM Backend Layer (provider-agnostic)
@@ -83,6 +86,7 @@ src/scattering_ai/
 ├── domains/      # domain packs (rmc/, pdf/, phonons/, diffuse/, symmetry/)
 ├── rag/          # indexing, retrieval, citations
 ├── tools/        # generic tool layer (files, plots, statistics)
+├── learning/     # growth loop: journal → signals → proposals → guarded apply
 ├── reports/      # report templates and renderers
 └── evaluation/   # eval harness, rubrics, regression cases
 ```
@@ -238,14 +242,20 @@ Domain packs may extend `data` with typed sub-schemas; the envelope stays stable
 
 ## Development Tracks
 
-Work is organized into four tracks. Phases within a track are sequential; tracks run in parallel where noted. This replaces a rigid single ladder: after the first vertical slice (A0 → A1 → B1), tracks B, C, and D can advance independently.
+Work is organized into five tracks. Phases within a track are sequential; tracks run in parallel where noted. This replaces a rigid single ladder: after the first vertical slice (A0 → A1 → B1), tracks B, C, D, and E can advance independently.
 
 ```text
 Track A — Core Runtime        A0 bootstrap → A1 schemas+LLM → A2 agent loop → A3 orchestration
 Track B — Domain Capability   B1 RMC slice → B2 knowledge/RAG → B3 tools/skills → B4 more domains
 Track C — Integration         C1 Python API → C2 CLI → C3 FastAPI → C4 MCP server → C5 app connectors → C6 data adapters
-Track D — Trust & Quality     D1 diagnostics → D2 reports → D3 evaluation harness → D4 provenance → D5 publication
+Track D — Trust & Quality     D1 diagnostics → D2 reports → D3 evaluation harness → D4 provenance → D5 publication → D6 adversarial robustness
+Track E — Growth Loop         E1 capture → E2 signals+corrections → E3 proposals → E4 guarded apply → E5 closed loop → E6 capture everywhere → E7 agent briefs → E8 data-gated queue → E9 knowledge growth
 ```
+
+Track E is the consequence of D14: because capability is data-gated, the SDK
+must improve *during* use, not between finished specs. Tracks B and E are
+complementary halves of the same growth: B adds capability when data arrives;
+E captures what real use reveals and turns it into reviewed improvements.
 
 ---
 
@@ -479,9 +489,103 @@ Provenance block (above) becomes mandatory in output validation; reports without
 - **Claim:** improved workflow efficiency, reproducibility, and interpretability from combining structured scientific state, deterministic diagnostics, curated knowledge, tool-augmented LLM reasoning, and testable reports.
 - **Required evidence:** case studies (RMC convergence monitoring; local-vs-average conflict detection; phonon mode interpretation from RMC ensembles; 3D-ΔPDF feature explanation; multi-run comparison), benchmark tasks, before/after workflow comparison, error analysis, domain-expert evaluation, reproducible examples, open-source repo.
 
+#### D6 — Adversarial Robustness
+
+Safety code must survive an attacker's reading, not just a friendly one.
+Origin: an independent-agent review (Codex driven from Claude Code, 2026-07-04)
+found a real symlink-escape gap in the Tier-0 guarded applier — the path
+allowlist checked the relative string while the filesystem write followed
+symlinks. Fixed and regression-tested the same day; the lesson generalizes.
+
+- **Deliverables:** an *attacking* test for every safety invariant —
+  - **Write-path containment:** the guarded-apply denylist/allowlist resist
+    `..` traversal and **symlink** escapes; every filesystem touch stays inside
+    its allowlisted base (landed 2026-07:
+    `test_tier0_symlink_target_cannot_escape_into_source`).
+  - **Untrusted-data hardening:** malformed CIF/NeXus/`.gr`, hostile filenames,
+    sentinel/NaN edges, and oversized inputs fail loudly, never silently
+    corrupting state or the journal.
+  - **Prompt-injection posture:** retrieved knowledge and tool output feeding
+    the LLM are treated as data, never instructions.
+  - **Redaction as a security invariant:** the journal and proposals never
+    capture data values, even under crafted inputs.
+- **Method:** delegate periodic adversarial review to a second agent (Codex via
+  the plugin) and pin every confirmed finding as a regression case — the growth
+  loop (Track E) turned on the SDK's own safety.
+- **Definition of Done:** a documented threat model with a test per invariant;
+  a new write path or external surface ships only with its robustness cases.
+
 ---
 
-## Milestones
+### Track E — Growth Loop (self-improvement & self-implementation)
+
+The consequence of D14/D15: the SDK improves *during* real use. It observes
+what happens, turns recurring signals and human corrections into reviewable
+proposals, and — under the tier guarantees — lands data changes behind the eval
+gate or hands larger work to a coding agent on an isolated branch. The agent
+grows with the researcher; nothing scientific changes without a human-reviewed,
+eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
+
+#### E1–E5 — the review loop (✅ built, 2026-07)
+
+- **E1 Capture** (`learning/journal.py`): opt-in, redacted, append-only episode
+  log — category labels + identifiers only, never data values. Read-only w.r.t.
+  the SDK; a journaling failure never affects analysis.
+- **E2 Signals + corrections** (`learning/signals.py`): deterministic signal
+  extraction (errors, warnings, provenance gaps, low confidence, empty results)
+  with no LLM; human-only corrections recorded verbatim; `learn signals`
+  clusters by severity × recurrence.
+- **E3 Proposals** (`learning/proposals.py`): each cluster → a tier-classified
+  proposal from a deterministic template; an LLM may polish prose only, never
+  evidence or suggested values. `learn review` renders markdown.
+- **E4 Guarded apply** (`learning/apply.py`): nothing applies without explicit
+  approval; Tier-0 writes an allowlisted data diff, runs the eval gate, and
+  keeps it only if green (else reverts byte-for-byte); Tier-1 drafts; Tier-2
+  hands off a task; a denylist raises on any source write. Every apply audited.
+- **E5 Closed loop**: `tests/test_regressions.py` is the standing gate; a human
+  correction becomes a pinned, data-dependent regression case end-to-end (the
+  GaNb4Se8 transition-temperature case runs the real `detect_transitions`).
+
+#### E6 — Capture everywhere (next)
+
+- **Goal:** widen capture so more of real use becomes signal. Chat turns
+  (tool errors, dead-ends, repeated reformulations), MCP/connector calls, and
+  tool-level failures join the analyze journal — same redaction rules.
+- **DoD:** a stuck chat session and a failing tool call both surface in
+  `learn signals` and can seed a correction or proposal.
+
+#### E7 — Agent-executed improvement briefs (self-implementation)
+
+- **Goal:** for Tier-1/Tier-2 proposals the loop cannot safely auto-apply,
+  generate a self-contained **brief** (evidence episodes, failing case,
+  suggested change, affected files) and hand it to a coding agent
+  (Claude Code / Codex) on an **isolated git branch** — never the working tree.
+- **Guarantees (per D15):** the brief is evidence + intent, not a patch; the
+  agent's output returns as a branch + PR for human review, gated on the full
+  suite; scientific logic, schemas, and core code still change only by
+  human-reviewed diff. This is where "the agent implements with me" lives —
+  bounded by the same tier system that governs apply.
+- **DoD:** a recurring, reproduced failure cluster produces a branch whose diff
+  a human can review and merge; the loop never merges it.
+
+#### E8 — Data-gated capability queue
+
+- **Goal:** make the data-gating explicit. Capability the roadmap wants but
+  lacks data for (INS/S(Q,ω), Spinvert reference sets, rep-theory tables) sits
+  in a **watch queue**; when matching data lands in `data/`, the loop flags it,
+  scaffolds the pack/tool skeleton + eval placeholders, and opens a brief (E7).
+- **DoD:** dropping S(Q,ω) data into `data/` raises a "ready to build `ins`"
+  proposal with a scaffolded pack stub and a pinned known-answer eval to fill.
+
+#### E9 — Knowledge growth
+
+- **Goal:** corrections and resolved failures feed the curated knowledge base
+  (Tier-0 snippet proposals), so retrieved knowledge improves with use — the
+  RAG layer learns the researcher's real gotchas, cited and reviewed.
+- **DoD:** an accepted correction can land (human-approved) as a cited knowledge
+  snippet that a later related question retrieves.
+
+---
 
 ### Milestone 1 — RMC Run Health Report *(A0 + A1 + A2 + B1 + C1 + C2 + D2)* — ✅ done (2026-07-03)
 
@@ -511,6 +615,16 @@ RMC Monitor shows an AI Analysis panel; the monitor owns zero AI logic.
 
 The same SDK powers RMC Monitor, RMC Phonon Dynamics, and Neutron Diffuse Toolkit, and is reachable via MCP. At this point the project is a platform.
 
+### Milestone 5 — Self-Growing Assistant *(+ E1–E7, D6)*
+
+The SDK improves through use. Corrections and recurring failures become pinned
+regression evals and cited knowledge with human approval (E1–E5, ✅); larger
+fixes arrive as agent-drafted branches a human reviews (E6–E7); its own safety
+is adversarially tested and regression-pinned (D6). The measure is concrete:
+**the number of shipped capabilities and evals that originated from real use
+rather than the up-front plan grows over time** — the agent visibly grows with
+the researcher.
+
 ---
 
 ## Versioning & Release Policy
@@ -523,17 +637,19 @@ The same SDK powers RMC Monitor, RMC Phonon Dynamics, and Neutron Diffuse Toolki
 
 ---
 
-## Current Status (2026-07-03)
+## Current Status (2026-07-04)
 
 The tools-first foundation is **built and validated on real data**; `v0.1.0` is
-tagged and the repo is pushed. What exists now:
+tagged and the repo is pushed. The growth loop (Track E) is now live and the SDK
+has begun improving through its own use. What exists now:
 
 | Track | Done | Notes |
 |-------|------|-------|
 | A — Core Runtime | A0, A1, **A2 (full tool dispatch)** | A3 multi-agent still deferred |
-| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` technique packs)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` |
+| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` packs; PDF model fitting, OPTIMADE lookup, mPDF, magnetic-diffuse tools)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` (data-gated, E8) |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus / CIF / mCIF / RMCProfile `.rmc6f` readers) | all surfaces wrap the same core |
-| D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)** | reports carry figures the LLM reasons over; incomplete-provenance reports are rejected; D5 later |
+| D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)**, **D6 started (symlink-escape fix)** | incomplete-provenance reports rejected; adversarial hardening begun; D5 later |
+| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; E6–E9 next |
 
 Built beyond the original slice: a broad agent-tool registry + composite skills
 organized by category (patterns / series / slices / structure), CIF/mCIF
@@ -559,6 +675,14 @@ GaNb4Se8 series → transition at 39 K (high confidence, figures); diffuse volum
 neutron `.gr`. Auto-routing + a JSON-retry loop fixed the earlier local-model
 "interpretation unavailable" failure.
 
+Since 2026-07-03: PDF **model fitting** (`simulate_gr` + `fit_gr_model`),
+**OPTIMADE** structure lookup, **mPDF**, and the SpinHarmony-informed
+**magnetic-diffuse** tools (spin correlations, powder I(Q), frustration check,
+ΔPDF punch-and-fill). The **growth loop (Track E, E1–E5)** shipped: an opt-in
+redacted journal, deterministic signals + human corrections, tiered proposals,
+and a guarded apply with an eval gate — plus its first adversarial fix (D6,
+symlink escape, from a Codex-delegated review). **260 tests.**
+
 ## Immediate Next Actions
 
 The old bottom-up tool ladder is **done**. The next frontier is proving the
@@ -582,26 +706,34 @@ highest-impact gaps versus what the field's standard tools do are PDF
 (what agentic tools like guillemot do via OPTIMADE), and **mPDF** (diffpy.mpdf) —
 the last is a short step since the SDK already parses mCIF moments.
 
+The frontier has shifted. The first three impact items and the growth loop
+(Track E, E1–E5) are **done**; capability is now largely **data-gated**, so the
+next leverage is (a) making the growth loop capture and act on more of real use,
+and (b) the unblocked, publication-feeding work — not more one-off tools.
+
 ```text
+Done (2026-07): 1. PDF model comparison (simulate_gr_from_cif + fit_gr_model).
+                2. OPTIMADE structure lookup.  3. mPDF.
+                Magnetic-diffuse T1/T2/S1/S2/S3.  Growth loop E1–E5.
+                D6 first fix (symlink-escape hardening).
+
 Next (impact-ordered):
-1.  DONE (2026-07): PDF model comparison — simulate_gr_from_cif + fit_gr_model
-    (scale, sigma, lattice scale, Rw, overlay figure); CIF+G(r) auto-routes to
-    the pdf pack, which reports the fit automatically.
-2.  OPTIMADE structure lookup tool: query the federated crystal-structure
-    databases (COD/MP/OQMD/...) by composition/cell to identify candidate
-    phases for an observed pattern — cheap REST integration, large agent value.
-3.  mPDF: ideal magnetic PDF from an mCIF spin structure (we already read
-    moments); compare against measured neutron G(r) residues.
-4.  B4 — `ins` pack (inelastic neutron scattering, incl. phonons per D12),
-    once example S(Q,ω) data lands in data/ — also the home for rmc-phonon's
-    reciprocal-space / k-path utilities.
-5.  Symmetry, when representation-theory tables are available: klassengleiche
-    subgroups, irrep / symmetry-mode decomposition, k-vector → maximal
-    magnetic space groups (MAXMAGN).
-6.  D5 groundwork — reproducible case-study runs (phase transition,
-    inverted-.gr, diffuse contaminant/anisotropy, RMC convergence).
-7.  Chat polish: surface figures inline; optional streaming.
-8.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
+1.  E6 — capture everywhere: journal chat turns, tool failures, and MCP/connector
+    calls (same redaction), so more of real use becomes signal. Small, unblocks
+    the rest of Track E, and needs no new data.
+2.  D5 groundwork — reproducible case-study runs (phase transition, inverted-.gr,
+    diffuse contaminant/anisotropy, RMC convergence). Unblocked on existing data;
+    feeds the publication AND becomes pinned regression evals via the loop.
+3.  E7 — agent-executed improvement briefs: turn a reproduced failure cluster
+    into a self-contained brief a coding agent (Codex/Claude Code) implements on
+    an isolated branch for human review. This is the "self-implement" capability.
+4.  T3 — Spinvert-style RMC spin refinement (fit a spin config to measured
+    magnetic diffuse I(Q)); gated on reference data to validate against.
+5.  E8 — data-gated capability queue: when S(Q,ω) data lands, the loop scaffolds
+    the `ins` pack (phonons per D12; home for rmc-phonon k-path utils) + eval
+    placeholders and opens a brief. Same mechanism unblocks symmetry rep-theory.
+6.  Chat polish: surface figures inline; optional streaming.
+7.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
 
 ### Community-informed candidates (survey, 2026-07)
@@ -668,7 +800,19 @@ It calls tools when needed.
 It explains uncertainty.
 It recommends next steps.
 It produces reproducible reports.
+It learns from each engagement — under review.
 ```
+
+**The growth thesis (why the loop is central, not a feature).** This SDK cannot
+be finished from a spec: its correctness rule is *reproduce a known answer on
+real data*, and the data, known answers, corrections, and failure modes arrive
+over months of actual research. So capability is **data-gated** and must land
+incrementally. The growth loop (Track E) is the standing mechanism that turns
+everyday use — corrections, recurring failures, newly-arrived datasets — into
+pinned evals, cited knowledge, and human-reviewed changes. The agent grows with
+the researcher: every session can leave the SDK measurably more capable, without
+ever loosening the trust guarantees. Growth is bounded by the tiers, not by them
+being switched off.
 
 **What it will never do:**
 
