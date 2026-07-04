@@ -416,6 +416,13 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         lat, pos, sp = _structure(path)
         return sym.magnetic_symmetry(lat, pos, sp, magmoms)
 
+    def lookup_structures(elements: list[str] | None = None, formula: str = "",
+                          exclusive: bool = False, max_results: int = 10) -> dict:
+        from scattering_ai.tools.optimade import query_structures
+
+        return query_structures(elements=elements or None, formula=formula or None,
+                                exclusive=exclusive, max_results=max_results)
+
     def simulate_gr_from_cif(path: str, rmax: float = 20.0, sigma: float = 0.1,
                              radiation: str = "neutron") -> dict:
         from scattering_ai.tools.gr_model import simulate_gr
@@ -451,6 +458,28 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         except ImportError:
             pass
         return result
+
+    def simulate_mpdf_from_mcif(path: str, rmax: float = 20.0,
+                                sigma: float = 0.1) -> dict:
+        from scattering_ai.tools.cif import read_structure
+        from scattering_ai.tools.mpdf import simulate_mpdf
+
+        s = read_structure(path)
+        if not s.get("moments"):
+            return {"error": f"{path} has no magnetic moments (_atom_site_moment loop)"}
+        sim = simulate_mpdf(s["lattice"], s["positions"], s["moments"],
+                            rmax=rmax, sigma=sigma)
+        if "error" in sim:
+            return sim
+        out_path = artifact("mpdf_model", ".dat")
+        np.savetxt(out_path, np.column_stack([sim["r"], sim["f"]]),
+                   header="r  mPDF f(r) (ideal, arbitrary scale)")
+        i_min = int(np.argmin(sim["f"]))
+        i_max = int(np.argmax(sim["f"]))
+        return {"saved": str(out_path), "n_magnetic": sim["n_magnetic"],
+                "strongest_afm_distance": round(float(sim["r"][i_min]), 3),
+                "strongest_fm_distance": round(float(sim["r"][i_max]), 3),
+                "note": sim["note"]}
 
     def read_rmc6f(path: str) -> dict:
         from scattering_ai.tools.rmc_files import read_rmc6f as _read
@@ -760,6 +789,21 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 plot_structure,
             ),
             AgentTool(
+                "lookup_structures",
+                "Look up candidate crystal structures in the open OPTIMADE "
+                "databases (default: COD) by elements and/or reduced formula — "
+                "identify known phases matching an observed cell/composition. "
+                "NOTE: sends the element/formula query to an external web "
+                "service (your data never leaves the machine).",
+                _params(
+                    {"elements": {"type": "array", "items": string},
+                     "formula": string, "exclusive": {"type": "boolean"},
+                     "max_results": {"type": "integer"}},
+                    [],
+                ),
+                lookup_structures,
+            ),
+            AgentTool(
                 "simulate_gr_from_cif",
                 "Compute the model PDF G(r) of a crystal structure (CIF): pair "
                 "sums with neutron scattering lengths (or radiation='xray' Z "
@@ -785,6 +829,16 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                     ["gr_path", "cif_path"],
                 ),
                 fit_gr_model,
+            ),
+            AgentTool(
+                "simulate_mpdf_from_mcif",
+                "Compute the ideal magnetic PDF (mPDF) of an ordered magnetic "
+                "structure (mCIF with _atom_site_moment): negative peaks mark "
+                "antiferromagnetically correlated pair distances, positive "
+                "ferromagnetic. Saves the model curve; quantitative refinement "
+                "is diffpy.mpdf territory.",
+                _params({"path": string, "rmax": number, "sigma": number}, ["path"]),
+                simulate_mpdf_from_mcif,
             ),
             AgentTool(
                 "read_rmc6f",
