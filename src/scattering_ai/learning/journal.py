@@ -216,3 +216,27 @@ def episode_from_chat(session_id: str, model: str, turn_tools: list[dict],
         n_figures=0,
         outcome="error" if errored else "ok",
     )
+
+
+def episode_from_mcp_tool(name: str, result: dict) -> Episode:
+    """Build a redacted episode from one MCP individual tool call (E6).
+
+    Captures the tool *name* and whether it errored — never the arguments or the
+    result payload (which can carry data paths). A failing call becomes an error
+    finding keyed by the tool name, so recurring MCP tool failures cluster in
+    ``learn signals`` just like chat and analyze failures.
+    """
+    errored = bool(result.get("error"))
+    return Episode(
+        id="mcp-" + datetime.now(timezone.utc).strftime("%H%M%S%f")[:9],
+        timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        surface="mcp",
+        sdk_version=__import__("scattering_ai").__version__,
+        tools=[ToolEvent(name=name)],
+        findings=[FindingTag(diagnostic=name, severity="error")] if errored else [],
+        confidence="",
+        provenance_complete=True,
+        interpretation_available=True,
+        n_figures=0,
+        outcome="error" if errored else "ok",
+    )

@@ -73,7 +73,32 @@ def handle_tool_call(
     """Execute one tool call; always returns a JSON-safe dict."""
     if name == "analyze":
         return _run_analyze(arguments, workspace)
-    return registry.execute(name, arguments)
+    result = registry.execute(name, arguments)
+    _journal_mcp_failure(name, result)
+    return result
+
+
+def _journal_mcp_failure(name: str, result: dict[str, Any]) -> None:
+    """Capture a redacted episode when an MCP tool call fails (self-improvement
+    E6). Opt-in via ``SCATTERING_AI_JOURNAL``; best-effort — a journaling
+    failure never affects the tool response. Only failures are recorded (a
+    clean tool call is not a signal); the error message itself is never stored,
+    only the tool name."""
+    if not result.get("error"):
+        return
+    from scattering_ai.learning.journal import (
+        Journal,
+        episode_from_mcp_tool,
+        resolve_journal_dir,
+    )
+
+    directory = resolve_journal_dir(None)  # env-configured for the server
+    if directory is None:
+        return
+    try:
+        Journal(directory).record(episode_from_mcp_tool(name, result))
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------- resources

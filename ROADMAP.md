@@ -546,21 +546,26 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
   correction becomes a pinned, data-dependent regression case end-to-end (the
   GaNb4Se8 transition-temperature case runs the real `detect_transitions`).
 
-#### E6 — Capture everywhere (in progress)
+#### E6 — Capture everywhere (✅ core done, 2026-07)
 
 - **Goal:** widen capture so more of real use becomes signal. Chat turns
-  (tool errors, dead-ends, repeated reformulations), MCP/connector calls, and
-  tool-level failures join the analyze journal — same redaction rules.
-- **Done (2026-07):** `ChatSession` journals a redacted episode for every
-  *signal-bearing* turn — a tool errored (→ error finding keyed by tool name) or
-  the model produced no reply (→ dead-end via `interpretation_available`); clean
-  turns are not captured. `empty_result` was scoped to `analyze` so chat turns
-  don't trip it. Opt-in and best-effort; arguments/results never enter the
-  journal (redaction test on the chat path).
-- **Remaining:** MCP-server and app-connector call capture; cross-turn
-  "repeated reformulation" detection.
-- **DoD:** a stuck chat session and a failing tool call both surface in
-  `learn signals` and can seed a correction or proposal.
+  (tool errors, dead-ends), MCP/connector calls, and tool-level failures join
+  the analyze journal — same redaction rules.
+- **Done:** all three live surfaces now capture, opt-in and best-effort:
+  - **Chat** — `ChatSession` journals a redacted episode for each *signal-
+    bearing* turn: a tool errored (→ error finding keyed by tool name) or the
+    model produced no reply (→ dead-end via `interpretation_available`). Clean
+    turns are skipped.
+  - **MCP** — `handle_tool_call` captures a redacted `surface="mcp"` episode on
+    a failing individual tool call (name only; the error message is never
+    stored). Env-configured (`SCATTERING_AI_JOURNAL`).
+  - **Connectors** — already route through `Agent.analyze`, so they journal when
+    the agent has a journal.
+  - `empty_result` scoped to `analyze` so non-analyze surfaces don't trip it.
+    Redaction + off-by-default tests on every surface.
+- **Remaining (minor):** cross-turn "repeated reformulation" detection.
+- **DoD ✅:** a failing tool call in chat or over MCP surfaces in `learn signals`
+  as an `error_outcome` cluster keyed by the tool, ready to seed a proposal.
 
 #### E7 — Agent-executed improvement briefs (self-implementation)
 

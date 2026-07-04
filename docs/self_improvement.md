@@ -87,10 +87,13 @@ inferred: `record_correction(episode, target, statement, corrected_value)` (API
 
 - **P1 — Capture (DONE):** `learning/journal.py` — append-only, redacted,
   opt-in episode log wired into `Agent.analyze`; `scattering-ai learn status`.
-  Read-only; a journaling failure never affects analysis. **Extended (E6):**
-  `ChatSession` also journals a redacted episode for each *signal-bearing* chat
-  turn — a tool error (keyed by tool name) or a no-reply dead-end — so more of
-  real use becomes signal; clean turns are skipped.
+  Read-only; a journaling failure never affects analysis. **Extended (E6) to
+  every live surface:** `ChatSession` journals a redacted episode for each
+  *signal-bearing* chat turn (tool error keyed by tool name, or a no-reply
+  dead-end), and the MCP server journals a redacted `surface="mcp"` episode on a
+  failing individual tool call (name only — the error text is never stored).
+  Connectors already route through `Agent.analyze`. Clean calls are skipped;
+  redaction + off-by-default hold on every surface.
 - **P2 — Signals + corrections (DONE):** `learning/signals.py` — deterministic
   signal extraction (`error_outcome`, `unhandled_warning`, `provenance_gap`,
   `low_confidence`, `interpretation_unavailable`, `empty_result`) with no LLM and

@@ -120,3 +120,42 @@ def test_mcp_types_wiring_constructs():
                    mimeType=r["mimeType"])
     types.GetPromptResult(description="d", messages=[types.PromptMessage(
         role="user", content=types.TextContent(type="text", text="hi"))])
+
+
+# --- E6: capture MCP tool failures into the self-improvement journal ----------
+
+def test_mcp_tool_failure_journaled_when_configured(registry, tmp_path, monkeypatch):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "journal"
+    monkeypatch.setenv("SCATTERING_AI_JOURNAL", str(jdir))
+    # unknown tool -> registry returns {"error": ...}; the failure is captured
+    res = handle_tool_call(registry, "no_such_tool", {"secret": "/private/x.dat"},
+                           tmp_path / "ws")
+    assert "error" in res
+
+    eps = Journal(jdir).episodes()
+    assert len(eps) == 1 and eps[0].surface == "mcp" and eps[0].outcome == "error"
+    assert any(f.diagnostic == "no_such_tool" and f.severity == "error"
+               for f in eps[0].findings)
+    # redaction: neither the arguments nor the error message text are stored
+    raw = Journal(jdir).path.read_text()
+    assert "secret" not in raw and "/private/x.dat" not in raw
+
+
+def test_mcp_success_not_journaled_and_off_by_default(registry, tmp_path, monkeypatch):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "journal"
+    monkeypatch.setenv("SCATTERING_AI_JOURNAL", str(jdir))
+    path = tmp_path / "c.dat"
+    np.savetxt(path, np.column_stack([np.linspace(0, 10, 200),
+                                      1 + np.exp(-((np.linspace(0, 10, 200) - 5) ** 2))]))
+    ok = handle_tool_call(registry, "find_peaks_1d", {"path": str(path)}, tmp_path / "ws")
+    assert "error" not in ok
+    assert Journal(jdir).episodes() == []  # clean calls aren't signals
+
+    # with no journal env, nothing is written anywhere
+    monkeypatch.delenv("SCATTERING_AI_JOURNAL")
+    handle_tool_call(registry, "no_such_tool", {}, tmp_path / "ws")
+    assert not list(tmp_path.glob("**/episodes.jsonl"))
