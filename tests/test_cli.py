@@ -41,6 +41,19 @@ def test_cli_healthy_run_prints_to_stdout(capsys):
     assert "healthy" in out.lower()
 
 
+def test_cli_file_glob_and_dir_expand(tmp_path):
+    from scattering_ai.cli import _expand_files
+
+    for t in (5.0, 10.0, 15.0):
+        (tmp_path / f"scan_T_base_{t:.1f}K.dat").write_text("0 1\n1 2\n")
+    (tmp_path / "notes.md").write_text("skip me")
+    via_glob = _expand_files([str(tmp_path / "*.dat")])
+    via_dir = _expand_files([str(tmp_path)])
+    assert len(via_glob) == 3
+    assert via_dir == via_glob  # directory excludes the .md
+    assert all(p.endswith(".dat") for p in via_dir)
+
+
 def test_cli_bare_payload_auto_routes(tmp_path, capsys):
     """A bare payload now auto-routes (no --domain needed): r_values -> rmc."""
     bare = tmp_path / "bare.json"

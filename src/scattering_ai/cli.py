@@ -17,6 +17,30 @@ from scattering_ai.core.config import SDKConfig
 from scattering_ai.core.schemas import AnalysisRequest
 
 
+def _expand_files(entries: list[str]) -> list[str]:
+    """Expand glob patterns and directories so ``--file 'scan_*K.dat'`` or
+    ``--file series_dir`` work for a whole series, not just single paths."""
+    import glob as globlib
+    from pathlib import Path
+
+    expanded: list[str] = []
+    for entry in entries:
+        if any(ch in entry for ch in "*?["):
+            matches = sorted(globlib.glob(entry))
+            if not matches:
+                sys.exit(f"error: glob matched no files: {entry}")
+            expanded += matches
+        elif Path(entry).is_dir():
+            expanded += sorted(
+                str(f) for f in Path(entry).iterdir()
+                if f.is_file() and not f.name.startswith(".")
+                and f.suffix.lower() not in (".md", ".png")
+            )
+        else:
+            expanded.append(entry)
+    return list(dict.fromkeys(expanded))  # dedup, preserve order
+
+
 def _build_request(args: argparse.Namespace) -> AnalysisRequest:
     default_question = "Analyze this data and report what you find."
     if args.input is None:
@@ -25,7 +49,7 @@ def _build_request(args: argparse.Namespace) -> AnalysisRequest:
         return AnalysisRequest(
             domain=args.domain or "auto",
             question=args.question or default_question,
-            data={"files": args.file},
+            data={"files": _expand_files(args.file)},
         )
     payload = json.loads(Path(args.input).read_text())
     if "domain" in payload and "question" in payload:

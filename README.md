@@ -1,138 +1,122 @@
 # scattering-ai-sdk
 
-**AI SDK for scattering science** — a domain-grounded reasoning layer for AI-assisted RMC, PDF/total scattering, diffraction, phonon, and diffuse-scattering workflows.
-
-> Status: **pre-alpha**. The first vertical slice works end-to-end: RMC run health analysis with deterministic diagnostics, cited knowledge retrieval, optional LLM interpretation, and provenance-carrying reports. See [ROADMAP.md](ROADMAP.md).
-
-## What it is
-
-Scientific codes (RMCProfile, Phonopy, PDF and diffuse-scattering tools) compute. This SDK adds a disciplined reasoning layer on top:
+**An AI reasoning layer for scattering science** — RMC, total scattering / PDF,
+diffuse scattering, and diffraction workflows.
 
 ```text
-Scientific codes compute.
-Domain tools evaluate.
-The LLM reasons, explains, and guides.
+Scientific codes compute.  Domain tools evaluate.  The LLM reasons, explains, and guides.
 ```
 
-It accepts structured scientific state from applications, runs deterministic diagnostics, retrieves curated domain knowledge, optionally calls read-only analysis tools, and returns structured, cited, provenance-carrying reports. It never invents numbers, never mutates data, and works fully offline with local models.
+Point it at a data file and it detects the technique, runs deterministic
+diagnostics, retrieves cited domain knowledge, optionally calls an LLM to
+interpret, and returns a structured, **provenance-carrying** report **with
+summarizing figures**. It never invents numbers, never mutates data, and works
+fully offline with local models.
+
+> Status: **early, but useful.** Four domain packs, auto-routing, figure-backed
+> reports, and an evaluation harness are in place and validated on real data.
+> See [ROADMAP.md](ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md).
+
+## What it can tell you
+
+| You give it | It reports (deterministically, then the LLM interprets) | Figure |
+|-------------|--------------------------------------------------------|--------|
+| A **T/field scan** of patterns | Whether there's a **phase transition**, its T_c, and which peaks move | waterfall + peak tracking |
+| A **G(r) / S(Q)** curve | Non-standard/inverted G(r), low-r artifacts, first-neighbour distance, S(Q) vs S(Q)−1 | overview plot |
+| A **diffuse volume / slice** | Bragg-vs-diffuse character, contaminant powder rings, Bragg-punch coverage, sampling anisotropy | log-scale map |
+| **RMC monitor state** | Convergence trend, Bragg/PDF & neutron/x-ray conflicts, missing files | — |
 
 ## Install
 
 ```bash
-pip install -e ".[dev]"        # development
-pip install -e ".[llm]"        # + OpenAI-compatible LLM client (LM Studio / Ollama / vLLM / OpenAI)
+pip install -e ".[dev]"    # development
+pip install -e ".[all]"    # + LLM client, figures (matplotlib), volumes (h5py), API, MCP
 ```
 
-Requires Python ≥ 3.10.
+Python ≥ 3.10. Figures need the `plots` extra (matplotlib); volumes need `volumes` (h5py).
 
 ## Quick start
-
-Python API — works fully offline (deterministic diagnostics + cited knowledge retrieval); add an LLM client for scientific interpretation:
 
 ```python
 from scattering_ai import analyze
 
-# domain auto-detected from the input (a G(r) -> pdf, a volume -> diffuse,
-# RMC state -> rmc); pass domain=... to override.
+# Domain auto-detected from the input; pass domain=... to override.
 report = analyze(data={"files": ["FeCoSn_100K.gr"]})
-print(report.domain)        # -> "pdf"
-print(report.markdown)      # or report.model_dump_json()
-
-report = analyze(domain="rmc", question="Is this run healthy?", data=rmc_monitor_json)
+print(report.domain)      # -> "pdf"
+print(report.figures)     # -> [".../pdf_overview.png"]
+print(report.markdown)    # full report (or report.model_dump_json())
 ```
+
+Add a local LLM for interpretation (one client covers LM Studio / Ollama / vLLM / OpenAI):
 
 ```python
 from scattering_ai import Agent, AnalysisRequest
 from scattering_ai.core.config import SDKConfig
 from scattering_ai.llm.openai_compatible import OpenAICompatibleClient
 
-config = SDKConfig.lm_studio(model="your-model")   # or .ollama() / .openai() / .from_env()
-agent = Agent(llm=OpenAICompatibleClient(config), model_id=config.model)
+cfg = SDKConfig.ollama(model="qwen3:32b")       # or .lm_studio() / .openai() / .from_env()
+agent = Agent(llm=OpenAICompatibleClient(cfg), model_id=f"ollama:{cfg.model}")
+report = agent.analyze(AnalysisRequest(
+    question="Is there a phase transition across temperature?",
+    data={"files": ["scan_T_5K.dat", "scan_T_50K.dat", "..."]},
+))
 ```
 
-CLI:
+CLI — just point it at a file (domain auto-detected):
 
 ```bash
-scattering-ai analyze examples/rmc_monitor_demo/stalled_run.json               # offline
-scattering-ai analyze run.json --backend lmstudio --model m --out report.md   # with local LLM
-
-# just point it at a file — the domain is auto-detected (offline diagnostics):
-scattering-ai analyze --file my_pattern.gr
-
-# tool-driven analysis with a local LLM (the agent inspects, cuts, and fits):
-scattering-ai analyze --file my_pattern.gr \
-    --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
+scattering-ai analyze --file my_pattern.gr                     # offline diagnostics + figure
+scattering-ai analyze --file 'scan_dir/*.dat' --out report.md  # a T-series -> phase transition
+scattering-ai analyze --file scan_dir --backend ollama --model qwen3:32b   # + LLM interpretation
 ```
 
-Domains (auto-detected from the input, or pass `--domain` / `domain=`): `rmc`
-(run health), `pdf` (total scattering / G(r) & S(Q)), `diffuse` (single-crystal
-diffuse / 3D-ΔPDF volumes & slices), and `data` (generic tool-driven). Each pack
-ships its own diagnostics, knowledge, prompt, and next-check rules; third parties
-add packs via the `scattering_ai.domains` entry point without touching core.
-Every returned report is fully attributable — the SDK rejects reports with
-incomplete provenance.
+## Domains
 
-Interactive chat — iterative analysis with tools and skills (history and
-artifacts persist across turns; transcript saved for provenance):
+Auto-detected from the input, or set explicitly (`--domain` / `domain=`):
+
+- **`data`** — generic tool-driven analysis; detects a parametric series and hunts phase transitions.
+- **`pdf`** — total scattering: G(r), S(Q), F(Q).
+- **`diffuse`** — single-crystal diffuse scattering / 3D-ΔPDF (volumes and slices).
+- **`rmc`** — RMCProfile run health.
+
+Each pack is self-contained (diagnostics + knowledge + prompt + next-check rules
++ figures). Third parties add packs via the `scattering_ai.domains` entry point
+without touching core.
+
+## Other interfaces
 
 ```bash
 scattering-ai chat --backend ollama --model qwen3:32b --file data/1d/series/*.dat
-you> is there a phase transition in this series? masked points are -3.0
+scattering-ai plot my_pattern.gr --fit "2.64,3.73"     # quick-look plots (peaks/fits/slices/series)
+scattering-ai serve --port 8551                        # HTTP API ([api] extra)
+claude mcp add scattering-ai -- scattering-ai mcp      # expose tools to any MCP host
 ```
-
-Skills — validated multi-step workflows the agent invokes as one call:
-`skill_characterize_slice` (cut → peaks → rings → plot),
-`skill_fit_pattern_peaks` (find → fit all → residual plot → table),
-`skill_scan_series_transitions` (track peaks → changepoints → verdict).
-
-Quick-look plots for judging results (peaks, fits with residuals, slices, series):
-
-```bash
-scattering-ai plot my_pattern.gr                          # curve + detected peaks
-scattering-ai plot my_pattern.gr --fit "2.64,3.73"        # fit + residual panel
-scattering-ai plot slice.npz --log                        # 2D slice
-scattering-ai plot series_*K.dat --mask-value=-3.0        # waterfall vs T
-```
-
-HTTP API (`pip install ".[api]"`):
-
-```bash
-scattering-ai serve --port 8551    # GET /health /tools, POST /tools/{name} /analyze
-```
-
-MCP server — expose the tools to any agent host (Claude Code, IDEs, ...):
-
-```bash
-claude mcp add scattering-ai -- scattering-ai mcp
-```
-
-The host model then chains the SDK's 12 data tools itself (volume slicing,
-line cuts, peak fitting, ring detection, series tracking), plus a high-level
-`analyze` tool running the full diagnostics → knowledge → report loop.
-
-Application connectors — apps own zero AI logic:
 
 ```python
-from scattering_ai.connectors.rmc_monitor import analyze_monitor
-
-report = analyze_monitor(monitor_json)   # dict or path; returns AnalysisReport
-panel.show(report.markdown)
+from scattering_ai.connectors.rmc_monitor import analyze_monitor   # apps own zero AI logic
+report = analyze_monitor(monitor_json)
 ```
 
-## Design principles
+**Skills** — validated multi-step workflows the agent invokes as one call:
+`skill_scan_series_transitions`, `skill_characterize_slice`, `skill_fit_pattern_peaks`.
 
-- Rule-based diagnostics run **before** LLM reasoning — everything detectable without an LLM is detected without an LLM.
-- Every numerical claim traces to input data, a tool result, or a cited knowledge document.
-- Reports separate **Observation** / **Interpretation** / **Recommendation** and carry full provenance.
-- Local-first: no data leaves your machine unless you configure a cloud backend.
-- Domains (RMC, PDF, phonons, diffuse, symmetry, …) are plugins; core stays technique-agnostic.
+## How it works
+
+```text
+input → auto-route to a domain pack → deterministic diagnostics (+ figures)
+      → cited knowledge retrieval → optional LLM interpretation (tool-calling)
+      → schema + provenance validation → report (Markdown + JSON)
+```
+
+- **Diagnostics run before the LLM** — everything detectable without a model is.
+- **Every number is traceable** to input data, a tool result, or a cited document.
+- **Reports are attributable** — the SDK rejects reports with incomplete provenance.
+- **Local-first** — no data leaves your machine unless you configure a cloud backend.
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-pytest
-ruff check .
+pip install -e ".[dev]" && pytest && ruff check .
 ```
 
 ## License

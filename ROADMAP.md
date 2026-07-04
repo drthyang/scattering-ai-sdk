@@ -521,7 +521,7 @@ tagged and the repo is pushed. What exists now:
 | A — Core Runtime | A0, A1, **A2 (full tool dispatch)** | A3 multi-agent still deferred |
 | B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` technique packs)** | plugin architecture proven twice with no core reasoning changes; next pack `ins` |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus/CIF adapters) | all surfaces wrap the same core |
-| D — Trust & Quality | D1 (diagnostics), D2 (reports), D3 (eval harness), **D4 (provenance enforcement)** | reports with incomplete provenance are now rejected by output validation; D5 later |
+| D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)** | reports carry figures the LLM reasons over; incomplete-provenance reports are rejected; D5 later |
 
 Built beyond the original slice: 18 agent tools + 3 composite skills, interactive
 chat (Milestone 2, `chat/v3`), plotting toolkit, MCP server (13 tools), a
@@ -530,9 +530,13 @@ mask sentinel, per-peak monitoring summary — validated on the GaNb4Se8 39 K
 structural transition), and **domain auto-routing** (one entry point picks the
 pack from the input; `analyze(data={"files":[…]})` with no domain). CI, CHANGELOG.
 
-All four packs verified live on Ollama (gemma4:26b): PDF flags the inverted
-neutron `.gr`; diffuse reports the CORELLI 4.5× sampling anisotropy and a Cu
-ring as weak evidence; auto-routing + a JSON-retry loop fixed the local-model
+Every report now carries **summarizing figures** the LLM reasons over: the
+`data` pack detects a T/field series and reports the **phase transition**
+(T_c + which peaks move) with waterfall + tracking plots; `pdf` and `diffuse`
+emit an overview/map. All four packs verified live on Ollama (gemma4:26b):
+GaNb4Se8 series → transition at 39 K (high confidence, figures); diffuse volume
+→ 4.5× anisotropy + figure the model cites by path; PDF flags the inverted
+neutron `.gr`. Auto-routing + a JSON-retry loop fixed the earlier local-model
 "interpretation unavailable" failure.
 
 ## Immediate Next Actions
@@ -541,20 +545,20 @@ The old bottom-up tool ladder is **done**. The next frontier is proving the
 **plugin architecture with a real technique pack** (Track B4) and hardening
 trust (D4), not more one-off tools.
 
-Done in this pass: B4 `pdf` + `diffuse` packs, the D10 next-check-rules move,
-and D4 provenance enforcement (reports with incomplete provenance are rejected;
-model/prompt_version required once an LLM contributes).
+Done recently: B4 `pdf` + `diffuse` packs; D10 next-check-rules move; D4
+provenance enforcement; domain **auto-routing** (one entry point); LLM-loop
+hardening (reasoning-block/prose-tolerant JSON + retry); **summarizing figures**
+in reports with first-class **phase-transition** detection in the `data` pack.
 
 ```text
 Next:
 1.  B4 — `ins` pack (inelastic neutron scattering, incl. phonons per D12):
-    deterministic diagnostics on S(Q,ω) / dispersion / DOS data once such data
-    lands in data/. Needs example data first (acceptance = known answer).
-2.  D5 groundwork — assemble the case studies the packs now enable
-    (RMC convergence, inverted-.gr detection, diffuse contaminant/anisotropy)
-    into reproducible example runs for the publication evidence base.
-3.  Chat polish: surface tracking/waterfall/slice plot paths in the reply;
-    optional streaming.
+    diagnostics on S(Q,ω) / dispersion / DOS data once such data lands in data/
+    (acceptance = known answer). Deferred until example data exists.
+2.  D5 groundwork — assemble reproducible case-study runs the packs now enable
+    (phase transition, inverted-.gr, diffuse contaminant/anisotropy, RMC
+    convergence) for the publication evidence base.
+3.  Chat polish: surface figures inline; optional streaming.
 4.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
 
