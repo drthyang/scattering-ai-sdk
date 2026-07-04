@@ -72,8 +72,12 @@ inferred: `record_correction(episode, target, statement, corrected_value)` (API
 2. No proposal auto-applies; every apply needs explicit approval
    (`test_nothing_applies_without_approval`).
 3. Tier-0 apply is eval-gated and reversible; Tier-1 is draft-only; Tier-2
-   files are denylisted — attempting to write one **raises** `TierViolation`
-   (`test_denylist_blocks_source_and_schemas`, `test_tier0_reverts_*`).
+   files are denylisted — attempting to write one **raises** `TierViolation`.
+   The denylist/allowlist check the relative *string*, so every filesystem
+   touch also refuses to traverse a **symlink** (which could otherwise redirect
+   an allowlisted path onto denylisted source)
+   (`test_denylist_blocks_source_and_schemas`, `test_tier0_reverts_*`,
+   `test_tier0_symlink_target_cannot_escape_into_source`).
 4. Full audit: proposal → evidence episodes → outcome, in `applied.jsonl`
    (`test_tier0_lands_only_when_gate_green`). A human makes the git commit.
 5. Local-first; nothing transmitted; the LLM only phrases already-local prose

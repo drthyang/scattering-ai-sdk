@@ -427,6 +427,22 @@ def test_tier0_revert_restores_prior_content(tmp_path):
     assert target.read_text() == "ORIGINAL"  # pre-existing content untouched
 
 
+def test_tier0_symlink_target_cannot_escape_into_source(tmp_path):
+    # Reported by a Codex-delegated review: the allowlist/denylist check the
+    # relative string, so a symlinked tests/regressions -> src/ would let a
+    # Tier-0 write land on denylisted source while the string stays "allowed".
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "tests").mkdir()
+    (repo / "tests" / "regressions").symlink_to(repo / "src", target_is_directory=True)
+
+    j = _journal(tmp_path)
+    p = _regression_proposal()  # would write tests/regressions/<id>.json
+    with pytest.raises(TierViolation):
+        apply_proposal(p, journal=j, repo_root=repo, approve=True, gate=_GREEN)
+    assert not any((repo / "src").iterdir())  # nothing reached source via the link
+
+
 def test_tier1_writes_inert_draft_never_source(tmp_path):
     corr = make_correction("e2", target="domain", statement="should be pdf",
                            domain="data")

@@ -220,18 +220,40 @@ def pytest_gate(repo_root: Path,
 
 # --- filesystem helpers (byte-exact, reversible) ------------------------------
 
+def _target(base: Path, rel: str) -> Path:
+    """``base / rel``, but reject it if any existing path component is a symlink.
+
+    The tier allowlist/denylist checks operate on the relative *string*, so a
+    symlink in the tree (e.g. ``tests/regressions`` linked into ``src/``) could
+    redirect a write past them — the string stays allowlisted while the bytes
+    land on denylisted source. Refusing to traverse a symlink closes that gap;
+    combined with the no-``..``/no-absolute check in ``_normalize``, the real
+    target is guaranteed to stay within ``base`` at its allowlisted location.
+    """
+    cur = base
+    for part in Path(rel).parts:
+        cur = cur / part
+        if cur.is_symlink():
+            raise TierViolation(
+                f"refusing to touch {rel!r}: component '{part}' is a symlink; a "
+                "symlinked path can escape the tier allowlist/denylist")
+        if not cur.exists():
+            break  # remaining components don't exist yet, so can't be symlinks
+    return base / rel
+
+
 def _snapshot(base: Path, writes: list[FileWrite]) -> dict[str, bytes | None]:
     """Record prior contents so a failed gate can be reverted byte-for-byte."""
     snap: dict[str, bytes | None] = {}
     for w in writes:
-        target = base / w.path
+        target = _target(base, w.path)
         snap[w.path] = target.read_bytes() if target.exists() else None
     return snap
 
 
 def _write_all(base: Path, writes: list[FileWrite]) -> list[str]:
     for w in writes:
-        target = base / w.path
+        target = _target(base, w.path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(w.content, encoding="utf-8")
     return [w.path for w in writes]
@@ -239,7 +261,7 @@ def _write_all(base: Path, writes: list[FileWrite]) -> list[str]:
 
 def _revert(base: Path, snapshot: dict[str, bytes | None]) -> None:
     for rel, prior in snapshot.items():
-        target = base / rel
+        target = _target(base, rel)
         if prior is None:
             target.unlink(missing_ok=True)
             # best-effort: drop dirs we newly created and left empty
