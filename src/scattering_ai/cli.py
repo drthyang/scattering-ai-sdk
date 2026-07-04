@@ -187,6 +187,11 @@ def main(argv: list[str] | None = None) -> int:
     serve_cmd.add_argument("--port", type=int, default=8551)
     serve_cmd.add_argument("--workspace", default="", help="Directory for tool artifacts")
 
+    cases_cmd = sub.add_parser(
+        "case-studies", help="Run reproducible known-answer case studies (D5); "
+        "data-gated cases skip when their data is absent")
+    cases_cmd.add_argument("--json", action="store_true", help="Emit results as JSON")
+
     chat_cmd = sub.add_parser(
         "chat", help="Interactive analysis session (requires an LLM backend)"
     )
@@ -376,6 +381,18 @@ def main(argv: list[str] | None = None) -> int:
                 out.write_text(markdown, encoding="utf-8")
                 print(f"(wrote {out})")
         return 0
+    if args.command == "case-studies":
+        from scattering_ai.evaluation.case_studies import run_all
+
+        results = run_all()
+        if args.json:
+            print(json.dumps([r.model_dump() for r in results], indent=2))
+        else:
+            for r in results:
+                extra = f" — {r.reason}" if r.reason else (
+                    f" — {', '.join(r.unmet)}" if r.unmet else "")
+                print(f"{r.status.upper():8} {r.name}{extra}")
+        return 1 if any(r.status == "failed" for r in results) else 0
     if args.command == "mcp":
         from scattering_ai.server.mcp import serve
 

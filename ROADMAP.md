@@ -488,6 +488,14 @@ Provenance block (above) becomes mandatory in output validation; reports without
 - **Angle:** *A domain-grounded agent framework for AI-assisted scattering and atomistic modeling workflows.*
 - **Claim:** improved workflow efficiency, reproducibility, and interpretability from combining structured scientific state, deterministic diagnostics, curated knowledge, tool-augmented LLM reasoning, and testable reports.
 - **Required evidence:** case studies (RMC convergence monitoring; local-vs-average conflict detection; phonon mode interpretation from RMC ensembles; 3D-ΔPDF feature explanation; multi-run comparison), benchmark tasks, before/after workflow comparison, error analysis, domain-expert evaluation, reproducible examples, open-source repo.
+- **Groundwork done (2026-07):** `evaluation/case_studies.py` — a known-answer
+  case-study harness (`scattering-ai case-studies`). Two RMC cases run on
+  committed demo data (local-vs-average conflict; healthy baseline); three
+  data-gated cases (inverted neutron `.gr`, GaNb4Se8 phase transition, CORELLI
+  diffuse anisotropy) run on the researcher's local data and skip cleanly in CI.
+  Each declares its publication angle; a case never *fails* unless a known
+  answer regresses. New corrections seed both a case study and a regression
+  case, so the publication evidence and the suite grow from the same source.
 
 #### D6 — Adversarial Robustness
 
