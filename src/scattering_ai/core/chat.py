@@ -63,6 +63,7 @@ class ChatSession:
         workspace: str | Path | None = None,
         files: list[str] | None = None,
         on_tool_call=None,
+        journal: str | Path | None = None,
     ):
         from scattering_ai.core.agent import _default_workspace
         from scattering_ai.tools.registry import default_toolkit
@@ -73,6 +74,8 @@ class ChatSession:
         self.registry = default_toolkit(self.workspace)
         self.on_tool_call = on_tool_call  # callback(name, args, result) for UIs
         self.tool_trace: list[dict] = []
+        self.journal = journal  # opt-in self-improvement journal (P1/P2)
+        self.session_id = "chat-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
 
         context = ""
         if files:
@@ -129,6 +132,30 @@ class ChatSession:
         self.messages.append(Message(role="assistant", content=reply))
         self._save_transcript()
         return reply
+
+    def record_correction(self, target: str, statement: str,
+                          corrected_value: str = "", domain: str = ""):
+        """Record a **human** correction from within the chat (P2).
+
+        This is the chat affordance for the highest-value signal: a UI wires a
+        "flag correction" action to this method. The correction is never
+        inferred by the model — the assistant does not extract corrections from
+        the dialogue; only an explicit human act records one. It is attributed
+        to this chat session and lands in the same journal as ``analyze`` runs,
+        so it feeds ``learn signals`` / ``learn review`` identically.
+        """
+        from scattering_ai.learning.journal import Journal, resolve_journal_dir
+        from scattering_ai.learning.signals import make_correction
+
+        directory = resolve_journal_dir(self.journal)
+        if directory is None:
+            raise RuntimeError(
+                "no journal configured; pass ChatSession(journal=...) or set "
+                "SCATTERING_AI_JOURNAL before recording a correction")
+        correction = make_correction(self.session_id, target, statement,
+                                     corrected_value, domain)
+        Journal(directory).record_correction(correction)
+        return correction
 
     def _save_transcript(self) -> None:
         lines = [

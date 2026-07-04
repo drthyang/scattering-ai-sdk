@@ -216,9 +216,53 @@ def main(argv: list[str] | None = None) -> int:
         "learn", help="Self-improvement: review the local analysis journal "
         "(read-only; opt-in via SCATTERING_AI_JOURNAL)")
     learn_sub = learn_cmd.add_subparsers(dest="learn_command", required=True)
+    _journal_help = "Journal directory (default: $SCATTERING_AI_JOURNAL)"
     learn_status = learn_sub.add_parser("status", help="Summarize the episode journal")
-    learn_status.add_argument("--journal", default="",
-                              help="Journal directory (default: $SCATTERING_AI_JOURNAL)")
+    learn_status.add_argument("--journal", default="", help=_journal_help)
+
+    learn_signals = learn_sub.add_parser(
+        "signals", help="Cluster deterministic signals (and corrections) from "
+        "the journal — the evidence future proposals cite")
+    learn_signals.add_argument("--journal", default="", help=_journal_help)
+
+    learn_correct = learn_sub.add_parser(
+        "correct", help="Record a HUMAN correction of a past result "
+        "(seeds a regression eval); never inferred by the system")
+    learn_correct.add_argument("--journal", default="", help=_journal_help)
+    learn_correct.add_argument("--episode", default="",
+                               help="Id of the episode being corrected (see 'learn status')")
+    learn_correct.add_argument("--target", required=True,
+                               help="What was wrong: domain, transition_temperature, ...")
+    learn_correct.add_argument(
+        "--statement", required=True,
+        help="Plain-English correction, e.g. 'transitions are 50 K and 29 K, not 39 K'")
+    learn_correct.add_argument("--value", default="",
+                               help="Corrected value (optional, machine-usable)")
+    learn_correct.add_argument("--domain", default="",
+                               help="Domain the correction applies to")
+
+    learn_review = learn_sub.add_parser(
+        "review", help="Generate reviewable improvement proposals from the "
+        "journal's signals (read-only; nothing is applied)")
+    learn_review.add_argument("--journal", default="", help=_journal_help)
+    learn_review.add_argument("--min-occurrences", type=int, default=3,
+                              help="Recurrence a non-correction signal needs to propose (default: 3)")
+    learn_review.add_argument("--json", action="store_true",
+                              help="Emit proposals as JSON instead of markdown")
+    learn_review.add_argument("--write", action="store_true",
+                              help="Also write proposals.md into the journal directory")
+
+    learn_apply = learn_sub.add_parser(
+        "apply", help="Apply one proposal under its tier's guarantees "
+        "(Tier-0 eval-gated diff; Tier-1 draft; Tier-2 task). Requires --approve")
+    learn_apply.add_argument("--journal", default="", help=_journal_help)
+    learn_apply.add_argument("--id", required=True, help="Proposal id (see 'learn review')")
+    learn_apply.add_argument("--approve", action="store_true",
+                             help="Explicit approval — without it, this is a dry run")
+    learn_apply.add_argument("--min-occurrences", type=int, default=3,
+                             help="Must match the 'learn review' threshold that produced the id")
+    learn_apply.add_argument("--repo", default="",
+                             help="Repo root for Tier-0 writes (default: enclosing git root)")
 
     args = parser.parse_args(argv)
     if args.command == "learn":
@@ -228,7 +272,56 @@ def main(argv: list[str] | None = None) -> int:
         if directory is None:
             sys.exit("error: no journal configured; set SCATTERING_AI_JOURNAL or "
                      "pass --journal DIR")
-        print(json.dumps(Journal(directory).summary(), indent=2))
+        journal = Journal(directory)
+        if args.learn_command == "status":
+            print(json.dumps(journal.summary(), indent=2))
+        elif args.learn_command == "signals":
+            from scattering_ai.learning.signals import signals_report
+
+            print(json.dumps(signals_report(journal), indent=2))
+        elif args.learn_command == "correct":
+            from scattering_ai.learning.signals import make_correction
+
+            correction = make_correction(args.episode, args.target, args.statement,
+                                         args.value, args.domain)
+            journal.record_correction(correction)
+            print(json.dumps({"recorded": "correction", **correction.model_dump()},
+                             indent=2))
+        elif args.learn_command == "review":
+            from scattering_ai.learning.proposals import build_proposals, render_proposals
+
+            proposals = build_proposals(journal, min_occurrences=args.min_occurrences)
+            if args.json:
+                print(json.dumps([p.model_dump() for p in proposals], indent=2))
+            else:
+                print(render_proposals(proposals))
+            if args.write:
+                out = directory / "proposals.md"
+                out.write_text(render_proposals(proposals), encoding="utf-8")
+                print(f"\n(wrote {out})")
+        elif args.learn_command == "apply":
+            from scattering_ai.learning.apply import apply_proposal, find_repo_root
+            from scattering_ai.learning.proposals import build_proposals
+
+            proposals = build_proposals(journal, min_occurrences=args.min_occurrences)
+            match = next((p for p in proposals if p.id == args.id), None)
+            if match is None:
+                sys.exit(f"error: no proposal with id {args.id!r}; run 'learn review' "
+                         f"(available: {', '.join(p.id for p in proposals) or 'none'})")
+            if not args.approve:
+                repo = args.repo or (find_repo_root() if match.tier == 0 else directory)
+                dest = "repo " + str(repo) if match.tier == 0 else "journal " + str(directory)
+                print(json.dumps({
+                    "dry_run": True,
+                    "proposal": match.id, "tier": match.tier,
+                    "change_class": match.change_class,
+                    "would_write_into": dest,
+                    "note": "no changes made; re-run with --approve to apply",
+                }, indent=2))
+                return 0
+            record = apply_proposal(match, journal=journal,
+                                    repo_root=args.repo or None, approve=True)
+            print(json.dumps(record.model_dump(), indent=2))
         return 0
     if args.command == "mcp":
         from scattering_ai.server.mcp import serve

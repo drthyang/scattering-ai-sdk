@@ -210,6 +210,32 @@ class Agent:
         except Exception:
             pass
 
+    def record_correction(self, episode, target: str, statement: str,
+                          corrected_value: str = "", domain: str = ""):
+        """Record a **human** correction of a past result (P2).
+
+        This is the highest-value signal and the one the system never infers:
+        a person states that a result was wrong (and optionally the right
+        value), referencing the episode it corrects. Unlike passive capture,
+        this is a deliberate act — so a missing journal *raises* rather than
+        being silently swallowed. ``episode`` may be an ``Episode`` or its id.
+        Returns the recorded ``Correction``.
+        """
+        from scattering_ai.learning.journal import Journal, resolve_journal_dir
+        from scattering_ai.learning.signals import make_correction
+
+        directory = resolve_journal_dir(self.journal)
+        if directory is None:
+            raise RuntimeError(
+                "no journal configured; set SCATTERING_AI_JOURNAL or "
+                "Agent(journal=...) before recording a correction")
+        episode_id = getattr(episode, "id", None) or str(episode)
+        domain = domain or getattr(episode, "domain", "")
+        correction = make_correction(episode_id, target, statement,
+                                     corrected_value, domain)
+        Journal(directory).record_correction(correction)
+        return correction
+
     def _retrieve(self, request: AnalysisRequest, pack: DomainPack) -> list[RetrievedChunk]:
         if not request.options.use_rag or self.knowledge_root is None:
             return []

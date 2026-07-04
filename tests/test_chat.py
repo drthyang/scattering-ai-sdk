@@ -130,3 +130,29 @@ def test_chat_files_context_in_system_prompt(tmp_path):
     system = llm.seen[0][0]
     assert system.role == "system"
     assert "/data/a.gr" in system.content and "/data/b.nxs" in system.content
+
+
+def test_chat_record_correction_feeds_journal(tmp_path):
+    # The chat affordance for human corrections (self-improvement P2): an explicit
+    # human act — never inferred from the dialogue — lands in the shared journal.
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "journal"
+    session = ChatSession(llm=ScriptedLLM([]), model_id="scripted",
+                          workspace=tmp_path / "ws", journal=jdir)
+    corr = session.record_correction(
+        target="transition_temperature",
+        statement="GaNb4Se8 transitions are 50 K and 29 K, not 39 K",
+        corrected_value="50,29", domain="series")
+
+    assert corr.episode_id == session.session_id and corr.corrected_value == "50,29"
+    corrs = Journal(jdir).corrections()
+    assert len(corrs) == 1 and corrs[0].target == "transition_temperature"
+
+
+def test_chat_correction_requires_journal(tmp_path):
+    import pytest
+
+    session = ChatSession(llm=ScriptedLLM([]), workspace=tmp_path / "ws")
+    with pytest.raises(RuntimeError):
+        session.record_correction(target="domain", statement="wrong route")

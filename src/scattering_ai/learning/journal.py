@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 JOURNAL_ENV = "SCATTERING_AI_JOURNAL"
 _FILE = "episodes.jsonl"
+_CORR_FILE = "corrections.jsonl"
 
 
 class ToolEvent(BaseModel):
@@ -57,6 +58,7 @@ class Episode(BaseModel):
     findings: list[FindingTag] = Field(default_factory=list)
     confidence: str = ""
     provenance_complete: bool = True
+    interpretation_available: bool = True  # LLM produced interpretation prose
     n_figures: int = 0
     outcome: str = "ok"  # "ok" | "warnings" | "error"
     duration_s: float | None = None
@@ -69,6 +71,7 @@ class Journal:
         self.dir = Path(directory)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.path = self.dir / _FILE
+        self.corr_path = self.dir / _CORR_FILE
 
     def record(self, episode: Episode) -> None:
         with self.path.open("a", encoding="utf-8") as fh:
@@ -82,6 +85,29 @@ class Journal:
             line = line.strip()
             if line:
                 out.append(Episode.model_validate_json(line))
+        return out
+
+    def record_correction(self, correction) -> None:
+        """Append a human-stated correction (P2).
+
+        Unlike an episode, a correction is a *deliberate human act*, not passive
+        capture — so it is stored verbatim (it carries the corrected value on
+        purpose) in a separate ``corrections.jsonl``. Still local-first; nothing
+        is transmitted.
+        """
+        with self.corr_path.open("a", encoding="utf-8") as fh:
+            fh.write(correction.model_dump_json() + "\n")
+
+    def corrections(self) -> list:
+        from scattering_ai.learning.signals import Correction
+
+        if not self.corr_path.exists():
+            return []
+        out = []
+        for line in self.corr_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                out.append(Correction.model_validate_json(line))
         return out
 
     def summary(self) -> dict[str, Any]:
@@ -153,6 +179,7 @@ def episode_from_analysis(report, findings, files, surface: str = "analyze",
                   for f in findings],
         confidence=report.confidence.value,
         provenance_complete=(prov.missing_fields(requires_model=bool(prov.model)) == []),
+        interpretation_available=bool(report.interpretation),
         n_figures=len(report.figures),
         outcome=outcome,
         duration_s=round(duration, 3) if duration is not None else None,
