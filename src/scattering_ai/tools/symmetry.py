@@ -221,6 +221,113 @@ def maximal_subgroups(lattice, positions, species, symprec: float = 1e-3,
     }
 
 
+# ----------------------------------------------------- systematic absences
+
+
+def _cell_params(m: np.ndarray) -> list[float]:
+    a, b, c = (float(np.linalg.norm(v)) for v in m)
+    al = float(np.degrees(np.arccos(np.dot(m[1], m[2]) / (b * c))))
+    be = float(np.degrees(np.arccos(np.dot(m[0], m[2]) / (a * c))))
+    ga = float(np.degrees(np.arccos(np.dot(m[0], m[1]) / (a * b))))
+    return [round(x, 5) for x in (a, b, c, al, be, ga)]
+
+
+def _centering(translations: np.ndarray, rotations: np.ndarray) -> str:
+    eye = np.eye(3, dtype=rotations.dtype)
+    pure = {tuple(np.round(np.mod(t, 1.0), 3))
+            for r, t in zip(rotations, translations, strict=True) if np.array_equal(r, eye)}
+    pure.discard((0.0, 0.0, 0.0))
+    half = {(0.5, 0.5, 0.5)}
+    faces = {(0.0, 0.5, 0.5), (0.5, 0.0, 0.5), (0.5, 0.5, 0.0)}
+    if not pure:
+        return "P"
+    if pure == half:
+        return "I"
+    if faces <= pure:
+        return "F"
+    if (2 / 3, 1 / 3, 1 / 3) in pure or (1 / 3, 2 / 3, 2 / 3) in pure:
+        return "R"
+    if pure & faces:
+        return {(0.0, 0.5, 0.5): "A", (0.5, 0.0, 0.5): "B", (0.5, 0.5, 0.0): "C"}[
+            next(iter(pure & faces))]
+    return "P"
+
+
+def systematic_absences(lattice, positions, species, max_index: int = 6,
+                        symprec: float = 1e-3) -> dict[str, Any]:
+    """Symmetry-allowed reflections and the systematic absences of the space
+    group. A reflection h is extinct when some operation (R, t) leaves it
+    invariant (Rᵀh = h) but shifts its phase (h·t is not integer) — the rule
+    behind centering, screw-axis, and glide-plane absences. Returns the allowed
+    reflections (with d, |Q|) so peak lists can be filtered by symmetry."""
+    spglib = _spglib()
+    cell, _ = _to_cell(lattice, positions, species)
+    conv = spglib.standardize_cell(cell, to_primitive=False, symprec=symprec)
+    lat = np.asarray(conv[0], dtype=float)
+    sym = spglib.get_symmetry(conv, symprec=symprec)
+    R, T = np.asarray(sym["rotations"]), np.asarray(sym["translations"])
+    ginv = np.linalg.inv(lat @ lat.T)
+
+    def is_absent(h) -> bool:
+        for r, t in zip(R, T, strict=True):
+            if np.array_equal(r.T @ h, h) and abs(np.dot(h, t) - round(np.dot(h, t))) > 1e-4:
+                return True
+        return False
+
+    seen: dict[float, tuple] = {}
+    n_absent = 0
+    rng = range(-max_index, max_index + 1)
+    for h in rng:
+        for k in rng:
+            for l in rng:  # noqa: E741
+                if h == k == l == 0:
+                    continue
+                hkl = np.array([h, k, l])
+                if is_absent(hkl):
+                    n_absent += 1
+                    continue
+                d = 1.0 / float(np.sqrt(hkl @ ginv @ hkl))
+                key = round(d, 4)
+                if key not in seen or _hkl_rank((h, k, l)) < _hkl_rank(seen[key][1]):
+                    seen[key] = (d, (h, k, l))
+    reflections = [
+        {"hkl": list(hkl), "d": round(d, 4), "q": round(2 * np.pi / d, 4)}
+        for d, hkl in sorted(seen.values(), reverse=True)
+    ]
+    return {
+        "space_group": int(spglib.get_symmetry_dataset(cell, symprec=symprec).number),
+        "centering": _centering(T, R),
+        "n_allowed_unique": len(reflections),
+        "n_absent": n_absent,
+        "allowed_reflections": reflections[:40],
+        "note": "reflection conditions from the space-group operations; allowed "
+        "list is a symmetry-filtered peak checklist (no structure factors)",
+    }
+
+
+def standardize_cell(lattice, positions, species, symprec: float = 1e-3,
+                     to_primitive: bool = False) -> dict[str, Any]:
+    """Standardize a structure to its conventional (or primitive) setting and
+    report the transformation from the input cell."""
+    spglib = _spglib()
+    cell, _ = _to_cell(lattice, positions, species)
+    ds = spglib.get_symmetry_dataset(cell, symprec=symprec)
+    std = spglib.standardize_cell(cell, to_primitive=to_primitive, symprec=symprec)
+    return {
+        "space_group": {"number": int(ds.number), "international": ds.international},
+        "input_cell": _cell_params(np.asarray(cell[0], dtype=float)),
+        "standardized_cell": _cell_params(np.asarray(std[0], dtype=float)),
+        "n_atoms_standardized": len(std[1]),
+        "setting": "primitive" if to_primitive else "conventional",
+        "transformation_matrix": np.asarray(ds.transformation_matrix).round(4).tolist(),
+        "origin_shift": np.asarray(ds.origin_shift).round(4).tolist(),
+    }
+
+
+def _hkl_rank(hkl) -> tuple:
+    return (sum(abs(i) for i in hkl), tuple(-abs(i) for i in hkl))
+
+
 # --------------------------------------------------------- pseudosymmetry
 
 

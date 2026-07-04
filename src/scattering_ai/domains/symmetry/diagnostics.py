@@ -68,6 +68,17 @@ def diagnose_file(path: str, workspace=None) -> list[Finding]:
         evidence={**fs, "n_atoms": meta["n_atoms"], "n_asymmetric": meta["n_asymmetric"]},
     )]
 
+    try:
+        sa = sym.systematic_absences(lattice, positions, species, max_index=5)
+        findings.append(Finding(
+            diagnostic="systematic_absences", severity=Severity.INFO,
+            message=f"{sa['centering']}-centred lattice; {sa['n_allowed_unique']} "
+            f"symmetry-allowed reflections in the checklist "
+            f"({sa['n_absent']} absent by symmetry).",
+            evidence=sa))
+    except Exception:
+        pass
+
     if workspace is not None:
         try:
             from scattering_ai.tools.structure_viz import plot_structure

@@ -117,6 +117,35 @@ def test_pseudosymmetry_finds_cubic_parent():
     assert ps["highest_symmetry"]["number"] == 221  # recovers the cubic parent
 
 
+# --------------------------------------------------- systematic absences
+
+
+def test_systematic_absences_centering_rules():
+    # body-centred: h+k+l even
+    bcc = sym.systematic_absences([3.16, 3.16, 3.16, 90, 90, 90],
+                                  [[0, 0, 0], [0.5, 0.5, 0.5]], ["W", "W"])
+    assert bcc["centering"] == "I"
+    assert all(sum(r["hkl"]) % 2 == 0 for r in bcc["allowed_reflections"])
+    # face-centred: hkl all-same-parity
+    fcc = sym.systematic_absences([3.6, 3.6, 3.6, 90, 90, 90],
+                                  [[0, 0, 0], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]],
+                                  ["Cu"] * 4)
+    assert fcc["centering"] == "F"
+    assert all(len({i % 2 for i in r["hkl"]}) == 1 for r in fcc["allowed_reflections"])
+    # primitive: (100) present
+    p = sym.systematic_absences(**PEROV)
+    assert p["centering"] == "P"
+    assert any(sorted(map(abs, r["hkl"])) == [0, 0, 1] for r in p["allowed_reflections"])
+
+
+def test_standardize_cell():
+    st = sym.standardize_cell([3.905, 3.905, 3.905, 90, 90, 90],
+                              [[0, 0, 0], [0.5, 0.5, 0.5]], ["Cs", "Cl"])
+    assert st["space_group"]["number"] == 221
+    assert st["standardized_cell"][:3] == [3.905, 3.905, 3.905]
+    assert len(st["transformation_matrix"]) == 3
+
+
 # --------------------------------------------------------- magnetic
 
 

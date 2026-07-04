@@ -385,6 +385,18 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         lat, pos, sp = _structure(path)
         return sym.magnetic_symmetry(lat, pos, sp, magmoms)
 
+    def systematic_absences(path: str, max_index: int = 6) -> dict:
+        from scattering_ai.tools import symmetry as sym
+
+        lat, pos, sp = _structure(path)
+        return sym.systematic_absences(lat, pos, sp, max_index=max_index)
+
+    def standardize_cell(path: str, to_primitive: bool = False) -> dict:
+        from scattering_ai.tools import symmetry as sym
+
+        lat, pos, sp = _structure(path)
+        return sym.standardize_cell(lat, pos, sp, to_primitive=to_primitive)
+
     def plot_structure(path: str, bonds: bool = True) -> dict:
         from scattering_ai.tools.cif import read_structure
         from scattering_ai.tools.structure_viz import plot_structure as _plot
@@ -632,6 +644,22 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "mCIF. Returns the image path and a structure summary.",
                 _params({"path": string, "bonds": {"type": "boolean"}}, ["path"]),
                 plot_structure,
+            ),
+            AgentTool(
+                "systematic_absences",
+                "Symmetry-allowed reflections and systematic absences of a "
+                "structure's space group (centering, screw, glide extinctions) — "
+                "a symmetry-filtered Bragg peak checklist with d and |Q|.",
+                _params({"path": string, "max_index": {"type": "integer"}}, ["path"]),
+                systematic_absences,
+            ),
+            AgentTool(
+                "standardize_cell",
+                "Standardize a structure to its conventional (or primitive) "
+                "setting; returns the cell parameters and the transformation "
+                "matrix + origin shift from the input cell.",
+                _params({"path": string, "to_primitive": {"type": "boolean"}}, ["path"]),
+                standardize_cell,
             ),
         ]
     )
