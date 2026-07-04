@@ -187,7 +187,8 @@ def episode_from_analysis(report, findings, files, surface: str = "analyze",
 
 
 def episode_from_chat(session_id: str, model: str, turn_tools: list[dict],
-                      reply: str, files, domain: str = "") -> Episode:
+                      reply: str, files, domain: str = "",
+                      reformulation: bool = False) -> Episode:
     """Build a redacted episode from one chat turn (self-improvement E6).
 
     ``turn_tools`` is this turn's slice of ``ChatSession.tool_trace`` — dicts
@@ -195,10 +196,15 @@ def episode_from_chat(session_id: str, model: str, turn_tools: list[dict],
     errored are kept; arguments and results never enter the journal. A tool
     error becomes an error finding keyed by the tool name (so recurring tool
     failures cluster in ``learn signals``); an empty reply flags a dead-end via
-    ``interpretation_available``.
+    ``interpretation_available``; ``reformulation`` (the user re-asking the same
+    thing) becomes a ``repeated_reformulation`` warning finding.
     """
     errored = [t for t in turn_tools if t.get("error")]
     findings = [FindingTag(diagnostic=t["tool"], severity="error") for t in errored]
+    if reformulation:
+        findings.append(FindingTag(diagnostic="repeated_reformulation",
+                                    severity="warning"))
+    outcome = "error" if errored else ("warnings" if reformulation else "ok")
     return Episode(
         id="chat-" + datetime.now(timezone.utc).strftime("%H%M%S%f")[:9],
         timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -214,7 +220,7 @@ def episode_from_chat(session_id: str, model: str, turn_tools: list[dict],
         provenance_complete=True,
         interpretation_available=bool(reply and reply.strip()),
         n_figures=0,
-        outcome="error" if errored else "ok",
+        outcome=outcome,
     )
 
 

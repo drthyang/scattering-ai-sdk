@@ -89,9 +89,10 @@ inferred: `record_correction(episode, target, statement, corrected_value)` (API
   opt-in episode log wired into `Agent.analyze`; `scattering-ai learn status`.
   Read-only; a journaling failure never affects analysis. **Extended (E6) to
   every live surface:** `ChatSession` journals a redacted episode for each
-  *signal-bearing* chat turn (tool error keyed by tool name, or a no-reply
-  dead-end), and the MCP server journals a redacted `surface="mcp"` episode on a
-  failing individual tool call (name only — the error text is never stored).
+  *signal-bearing* chat turn (tool error keyed by tool name, a no-reply
+  dead-end, or a **repeated reformulation** — the user re-asking the same thing,
+  detected by token overlap), and the MCP server journals a redacted
+  `surface="mcp"` episode on a failing individual tool call (name only).
   Connectors already route through `Agent.analyze`. Clean calls are skipped;
   redaction + off-by-default hold on every surface.
 - **P2 — Signals + corrections (DONE):** `learning/signals.py` — deterministic
@@ -134,13 +135,15 @@ inferred: `record_correction(episode, target, statement, corrected_value)` (API
   end-to-end; the GaNb4Se8 correction (`transition_temperature = 50,29`) lands as
   a Tier-0 regression case whose data-dependent check runs `detect_transitions`
   through the real subprocess gate.
-- **E7 — Agent briefs (DONE):** `learning/briefs.py` — `brief_from_proposal`
-  packages a Tier-1/Tier-2 proposal into an agent-ready work order (intent,
-  evidence, best-guess affected area, acceptance, non-negotiable constraints);
-  Tier-0 is rejected (it applies directly). `learn brief --id <id> [--write]`.
-  Per D15 the brief is **evidence + intent, never a patch**: it authorises no
-  merge; a coding agent (Codex / Claude Code) works it on an isolated branch a
-  human reviews.
+- **E7 — Agent briefs + hand-off (DONE):** `learning/briefs.py` —
+  `brief_from_proposal` packages a Tier-1/Tier-2 proposal into an agent-ready
+  work order (intent, evidence, best-guess affected area, acceptance,
+  non-negotiable constraints); Tier-0 is rejected. `learn brief --id <id>
+  [--write]`. `learning/handoff.py` + `learn handoff --id <id> [--agent
+  codex|claude]` emits a **one-command** hand-off onto an isolated git worktree
+  branch (`fix/<id>`). Per D15 the brief is **evidence + intent, never a patch**;
+  the loop prepares the hand-off but never launches the agent or merges — the
+  result is a branch + PR a human reviews.
 - **E8 — Data-gated watch queue (DONE):** `learning/watch.py` — a standing
   `WATCH_QUEUE` (ins pack, T3 spin refinement) matched by filename globs under
   `data/` (never reads data); `learn watch [--data DIR] [--brief]` reports which

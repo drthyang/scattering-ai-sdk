@@ -43,7 +43,7 @@ drop these gitignored facility datasets at these paths:
 | Phase transition | `data/1d/series/*tth.dat*.dat` | GaNb4Se8 2θ T-series (20 files, 5–99 K) | `data` pack reports a transition (30–50 K) |
 | Diffuse anisotropy | `data/3d/volumes/*.nxs` | CORELLI TbTi3Bi4 volume | `diffuse` pack flags ~4.5× sampling anisotropy |
 
-Everything else — 279 tests including the whole growth loop, all packs on
+Everything else — 285 tests including the whole growth loop, all packs on
 synthetic fixtures, and the two committed RMC case studies — needs no external
 data. See each `data/**/INVENTORY.md` for the exact axes/units/known-answer of
 files already dropped locally.

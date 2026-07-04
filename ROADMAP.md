@@ -571,9 +571,12 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
     the agent has a journal.
   - `empty_result` scoped to `analyze` so non-analyze surfaces don't trip it.
     Redaction + off-by-default tests on every surface.
-- **Remaining (minor):** cross-turn "repeated reformulation" detection.
-- **DoD ✅:** a failing tool call in chat or over MCP surfaces in `learn signals`
-  as an `error_outcome` cluster keyed by the tool, ready to seed a proposal.
+- **Reformulation (DONE):** `ChatSession` flags a *repeated reformulation* — the
+  user re-asking with high token (Jaccard) overlap of a recent prior turn, a
+  sign the assistant isn't landing — and journals it as a `repeated_reformulation`
+  warning, deterministically (no LLM).
+- **DoD ✅:** a failing tool call in chat or over MCP, or a user re-asking the
+  same thing, surfaces in `learn signals` ready to seed a proposal.
 
 #### E7 — Agent-executed improvement briefs (self-implementation, ✅ brief layer 2026-07)
 
@@ -590,10 +593,13 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
   carries no diff and cannot authorise a merge; the agent's output returns as a
   branch + PR for human review; scientific logic, schemas, and core code still
   change only by human-reviewed diff.
-- **Remaining:** optional one-command hand-off that launches the coding agent on
-  the branch (today the human copies the brief into Codex/Claude Code).
-- **DoD:** a recurring, reproduced failure cluster produces a brief a human runs
-  to get a reviewable branch; the loop never merges it.
+- **One-command hand-off (DONE):** `learning/handoff.py` + `learn handoff --id
+  <id> [--agent codex|claude]` writes the brief and emits a single command
+  sequence that puts the agent to work on an **isolated git worktree** branch
+  (`fix/<id>`) — the agent's changes never touch the current checkout and come
+  back as a branch to review. Per D15 it prepares, it does not launch or merge.
+- **DoD ✅:** a reproduced failure cluster produces a brief + a one-command
+  hand-off a human runs to get a reviewable branch; the loop never merges it.
 
 #### E8 — Data-gated capability queue (✅ mechanism, 2026-07)
 
@@ -689,7 +695,7 @@ has begun improving through its own use. What exists now:
 | B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)**, **B4 (`pdf` + `diffuse` + `symmetry` packs; PDF model fitting, OPTIMADE lookup, mPDF, magnetic-diffuse tools)** | plugin architecture proven three times with no core reasoning changes; next pack `ins` (data-gated, E8) |
 | C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus / CIF / mCIF / RMCProfile `.rmc6f` readers) | all surfaces wrap the same core |
 | D — Trust & Quality | D1 (diagnostics), D2 (**reports + summarizing figures**), D3 (eval harness), **D4 (provenance enforcement)**, **D6 started (symlink-escape fix)** | incomplete-provenance reports rejected; adversarial hardening begun; D5 later |
-| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop), E6 (capture chat + MCP), E7 (agent briefs), E8 (data-gated watch queue), E9 (knowledge growth)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; remaining wiring: E7 one-command hand-off, E6 reformulation |
+| E — Growth Loop | **E1–E5 (journal → signals+corrections → proposals → guarded apply → closed loop), E6 (capture chat + MCP), E7 (agent briefs), E8 (data-gated watch queue), E9 (knowledge growth)** | human-approved, eval-gated, diff-only; `docs/self_improvement.md`; the full loop is wired (capture→signals→proposals→apply→{eval, retrieved knowledge, brief, hand-off}) |
 
 Built beyond the original slice: a broad agent-tool registry + composite skills
 organized by category (patterns / series / slices / structure), CIF/mCIF
@@ -723,7 +729,7 @@ redacted journal, deterministic signals + human corrections, tiered proposals,
 and a guarded apply with an eval gate — plus its first adversarial fix (D6,
 symlink escape, from a Codex-delegated review). Track E completed E6–E9
 (capture chat + MCP failures, agent briefs, data-gated watch queue, knowledge
-growth) and D5's case-study harness landed. **279 tests.**
+growth) and D5's case-study harness landed. **285 tests.**
 
 ## Immediate Next Actions
 
@@ -764,12 +770,10 @@ Next (impact-ordered):
 1.  Data-gated builds, now self-flagged by the E8 watch queue: `ins` pack
     (S(Q,ω) / phonons per D12) and T3 Spinvert spin refinement — drop the data
     in data/, run `learn watch --brief`, hand the brief to a coding agent.
-2.  Close the E-track wiring: E7 one-command agent hand-off (launch Codex/Claude
-    Code on the branch), and E6 cross-turn "repeated reformulation" detection.
-3.  Symmetry rep-theory (klassengleiche subgroups, irrep/mode decomposition,
+2.  Symmetry rep-theory (klassengleiche subgroups, irrep/mode decomposition,
     MAXMAGN) — gated on representation-theory tables.
-4.  Chat polish: surface figures inline; optional streaming.
-5.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
+3.  Chat polish: surface figures inline; optional streaming.
+4.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
 
 ### Community-informed candidates (survey, 2026-07)

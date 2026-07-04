@@ -227,3 +227,34 @@ def test_chat_journaling_off_by_default(tmp_path):
                           model_id="m", workspace=tmp_path / "ws")  # no journal
     session.turn("?")
     assert not list(tmp_path.glob("**/episodes.jsonl"))
+
+
+def test_chat_repeated_reformulation_is_captured(tmp_path):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "j"
+    # two near-identical user turns, each with a clean reply -> the second is a
+    # reformulation (the assistant isn't landing) and gets journaled
+    session = ChatSession(
+        llm=ScriptedLLM([LLMResponse(content="Here is an answer."),
+                         LLMResponse(content="Here is another answer.")]),
+        model_id="m", workspace=tmp_path / "ws", journal=jdir)
+    session.turn("How do I fit the peak near two point six angstroms?")
+    session.turn("How do I fit the peak around two point six angstroms?")
+
+    eps = Journal(jdir).episodes()
+    assert len(eps) == 1 and eps[0].outcome == "warnings"
+    assert any(f.diagnostic == "repeated_reformulation" and f.severity == "warning"
+               for f in eps[0].findings)
+
+
+def test_chat_distinct_questions_are_not_reformulation(tmp_path):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "j"
+    session = ChatSession(
+        llm=ScriptedLLM([LLMResponse(content="A."), LLMResponse(content="B.")]),
+        model_id="m", workspace=tmp_path / "ws", journal=jdir)
+    session.turn("What is the first peak position?")
+    session.turn("Now slice the volume along the h axis and integrate.")
+    assert Journal(jdir).episodes() == []  # distinct, clean turns -> no signal

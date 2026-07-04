@@ -12,6 +12,7 @@ workspace for provenance.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -77,6 +78,7 @@ class ChatSession:
         self.journal = journal  # opt-in self-improvement journal (P1/P2/E6)
         self.files = list(files or [])
         self.session_id = "chat-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        self._user_turns: list[str] = []  # for reformulation detection (E6)
 
         context = ""
         if files:
@@ -107,6 +109,8 @@ class ChatSession:
     def turn(self, user_text: str) -> str:
         """One conversational turn: user text in, grounded assistant text out."""
         trace_start = len(self.tool_trace)
+        reformulation = self._is_reformulation(user_text)
+        self._user_turns.append(user_text)
         self.messages.append(Message(role="user", content=user_text))
         response = self.llm.complete(self.messages, tools=self.registry.specs)
         rounds = 0
@@ -133,15 +137,37 @@ class ChatSession:
         reply = response.content.strip()
         self.messages.append(Message(role="assistant", content=reply))
         self._save_transcript()
-        self._journal_turn(self.tool_trace[trace_start:], reply)
+        self._journal_turn(self.tool_trace[trace_start:], reply, reformulation)
         return reply
 
-    def _journal_turn(self, turn_tools: list[dict], reply: str) -> None:
+    @staticmethod
+    def _words(text: str) -> set[str]:
+        return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+    def _is_reformulation(self, user_text: str, threshold: float = 0.6) -> bool:
+        """Deterministically flag the user re-asking the same thing: high token
+        (Jaccard) overlap with a recent prior user turn signals the assistant
+        isn't landing — a dead-end worth capturing (E6)."""
+        cur = self._words(user_text)
+        if len(cur) < 2:
+            return False
+        for prev in self._user_turns[-3:]:
+            prev_words = self._words(prev)
+            if not prev_words:
+                continue
+            jaccard = len(cur & prev_words) / len(cur | prev_words)
+            if jaccard >= threshold:
+                return True
+        return False
+
+    def _journal_turn(self, turn_tools: list[dict], reply: str,
+                      reformulation: bool = False) -> None:
         """Capture a redacted episode for a signal-bearing chat turn (E6).
 
         Opt-in and best-effort — a journaling failure never affects the chat.
-        Only turns that reveal something (a tool errored, or the model produced
-        no reply — a dead-end) are recorded; clean turns are not signals.
+        Only turns that reveal something (a tool errored, the model produced no
+        reply, or the user is re-asking the same thing) are recorded; clean
+        turns are not signals.
         """
         from scattering_ai.learning.journal import (
             Journal,
@@ -153,12 +179,12 @@ class ChatSession:
         if directory is None:
             return
         errored = any(t.get("error") for t in turn_tools)
-        if not errored and reply:
+        if not errored and reply and not reformulation:
             return  # nothing worth capturing
         try:
             Journal(directory).record(
                 episode_from_chat(self.session_id, self.model_id, turn_tools,
-                                  reply, self.files))
+                                  reply, self.files, reformulation=reformulation))
         except Exception:
             pass
 

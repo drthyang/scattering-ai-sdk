@@ -279,6 +279,17 @@ def main(argv: list[str] | None = None) -> int:
     learn_brief.add_argument("--write", action="store_true",
                              help="Also write the brief into <journal>/briefs/")
 
+    learn_handoff = learn_sub.add_parser(
+        "handoff", help="Prepare a one-command hand-off of a Tier-1/2 proposal to "
+        "a coding agent (Codex/Claude Code) on an isolated worktree branch")
+    learn_handoff.add_argument("--journal", default="", help=_journal_help)
+    learn_handoff.add_argument("--id", required=True, help="Proposal id (see 'learn review')")
+    learn_handoff.add_argument("--agent", choices=["codex", "claude"], default="codex")
+    learn_handoff.add_argument("--min-occurrences", type=int, default=3,
+                               help="Must match the 'learn review' threshold that produced the id")
+    learn_handoff.add_argument("--repo", default="",
+                               help="Repo root for the worktree (default: enclosing git root)")
+
     learn_watch = learn_sub.add_parser(
         "watch", help="Data-gated capability queue: which roadmap builds are "
         "unblocked by data now present in data/")
@@ -380,6 +391,22 @@ def main(argv: list[str] | None = None) -> int:
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_text(markdown, encoding="utf-8")
                 print(f"(wrote {out})")
+        elif args.learn_command == "handoff":
+            from scattering_ai.learning.apply import find_repo_root
+            from scattering_ai.learning.handoff import prepare_handoff, render_handoff
+            from scattering_ai.learning.proposals import build_proposals
+
+            proposals = build_proposals(journal, min_occurrences=args.min_occurrences)
+            match = next((p for p in proposals if p.id == args.id), None)
+            if match is None:
+                sys.exit(f"error: no proposal with id {args.id!r}; run 'learn review' "
+                         f"(available: {', '.join(p.id for p in proposals) or 'none'})")
+            if match.tier == 0:
+                sys.exit(f"error: {match.id!r} is Tier-0 — apply it directly with "
+                         "'learn apply' (eval-gated); hand-off is for Tier-1/Tier-2")
+            repo = args.repo or str(find_repo_root())
+            plan = prepare_handoff(match, directory, repo, agent=args.agent)
+            print(render_handoff(plan))
         return 0
     if args.command == "case-studies":
         from scattering_ai.evaluation.case_studies import run_all

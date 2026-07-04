@@ -15,8 +15,9 @@ gates), not by policy. Full design in
   **redacted** episode log — category labels + identifiers only, never data
   arrays, evidence values, or message text. Wired into `Agent.analyze`, into
   `ChatSession` (a redacted episode per *signal-bearing* chat turn — a tool
-  error or a no-reply dead-end), and into the MCP server (a `surface="mcp"`
-  episode on a failing tool call — name only). Off by default
+  error, a no-reply dead-end, or a **repeated reformulation** where the user
+  re-asks the same thing, detected by token overlap), and into the MCP server (a
+  `surface="mcp"` episode on a failing tool call — name only). Off by default
   (`SCATTERING_AI_JOURNAL` / `Agent(journal=...)`), best-effort. `learn status`.
 - **Signals + corrections (P2, `learning/signals.py`):** deterministic signal
   extraction (`error_outcome`, `unhandled_warning`, `provenance_gap`,
@@ -41,10 +42,11 @@ gates), not by policy. Full design in
   temperature series and asserts the **real** `detect_transitions` recovers the
   corrected temperatures, so a scientific regression fails the gate. The
   GaNb4Se8 `transition_temperature = 50,29` correction lands end-to-end.
-- **Agent briefs (E7, `learning/briefs.py`):** a Tier-1/2 proposal becomes an
-  agent-ready work order (`learn brief`) — evidence + intent, never a patch —
-  for a coding agent (Codex / Claude Code) to implement on an isolated branch a
-  human reviews.
+- **Agent briefs + hand-off (E7, `learning/briefs.py`, `learning/handoff.py`):**
+  a Tier-1/2 proposal becomes an agent-ready work order (`learn brief`) — evidence
+  + intent, never a patch — and `learn handoff --id <id> [--agent codex|claude]`
+  emits a one-command hand-off that puts the agent to work on an **isolated git
+  worktree** branch a human reviews. The loop prepares; it never launches or merges.
 - **Data-gated watch queue (E8, `learning/watch.py`):** a standing queue (`ins`
   pack, T3 spin refinement) matched by filename globs under `data/`;
   `learn watch [--brief]` flags which builds are unblocked by newly-arrived data.
