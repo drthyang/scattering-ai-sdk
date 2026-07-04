@@ -3,7 +3,14 @@ import json
 import numpy as np
 import pytest
 
-from scattering_ai.server.mcp import handle_tool_call, tool_definitions
+from scattering_ai.server.mcp import (
+    get_prompt,
+    handle_tool_call,
+    prompt_definitions,
+    read_resource,
+    resource_definitions,
+    tool_definitions,
+)
 from scattering_ai.tools.registry import default_toolkit
 
 
@@ -63,3 +70,53 @@ def test_mcp_server_builds():
     payload = json.dumps(tool_definitions(registry))
     assert "analyze" in payload
     assert server_mcp.SERVER_NAME == "scattering-ai"
+
+
+def test_tool_definitions_include_new_tools_and_skills(registry):
+    names = {d["name"] for d in tool_definitions(registry)}
+    # newest tools + skills are exposed 1:1 over MCP
+    assert {"delta_pdf", "find_symmetry", "read_rmc6f", "skill_delta_pdf",
+            "skill_symmetry_overview"} <= names
+    analyze = next(d for d in tool_definitions(registry) if d["name"] == "analyze")
+    assert "symmetry" in analyze["parameters"]["properties"]["domain"]["enum"]
+
+
+def test_mcp_resources_expose_knowledge_and_domains():
+    resources = resource_definitions()
+    uris = {r["uri"] for r in resources}
+    assert "scattering-ai://domains" in uris
+    assert any(u.startswith("knowledge://") for u in uris)
+    # domains resource is valid JSON listing the packs
+    domains = json.loads(read_resource("scattering-ai://domains"))
+    assert {"rmc", "pdf", "diffuse", "symmetry", "data"} <= set(domains)
+    # a knowledge resource reads back its markdown
+    kn = next(u for u in uris if u.startswith("knowledge://"))
+    assert read_resource(kn).strip()
+
+
+def test_mcp_resource_read_rejects_traversal():
+    with pytest.raises(ValueError):
+        read_resource("knowledge://../../pyproject.toml")
+    with pytest.raises(ValueError):
+        read_resource("bogus://nope")
+
+
+def test_mcp_prompts():
+    names = {p["name"] for p in prompt_definitions()}
+    assert names == {"domain_guidance", "analyze_files"}
+    guidance = get_prompt("domain_guidance", {"domain": "pdf"})
+    assert guidance["messages"][0]["role"] == "user"
+    assert "S(Q)" in guidance["messages"][0]["content"]
+    files = get_prompt("analyze_files", {"files": "a.gr, b.nxs", "question": "healthy?"})
+    msg = files["messages"][0]["content"]
+    assert "analyze" in msg and "a.gr" in msg
+
+
+def test_mcp_types_wiring_constructs():
+    """The serve() handlers build these mcp objects — verify the API matches."""
+    types = pytest.importorskip("mcp.types")
+    r = resource_definitions()[0]
+    types.Resource(uri=r["uri"], name=r["name"], description=r["description"],
+                   mimeType=r["mimeType"])
+    types.GetPromptResult(description="d", messages=[types.PromptMessage(
+        role="user", content=types.TextContent(type="text", text="hi"))])

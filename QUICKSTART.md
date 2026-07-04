@@ -172,7 +172,7 @@ you> is there a phase transition in this series?
 
 ```bash
 scattering-ai serve --port 8551                    # HTTP API ([api] extra)
-claude mcp add scattering-ai -- scattering-ai mcp  # expose tools to any MCP host
+claude mcp add scattering-ai -- scattering-ai mcp  # tools + skills + knowledge resources + prompts
 ```
 
 ```python

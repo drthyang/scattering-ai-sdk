@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### MCP server — resources + prompts
+- The MCP server now exposes, beyond the tools + skills + `analyze`:
+  - **Resources**: the curated knowledge base (`knowledge://…`, path-traversal
+    guarded) and a `scattering-ai://domains` overview.
+  - **Prompts**: `domain_guidance` (a technique's grounding rules) and
+    `analyze_files` (a ready-to-send analysis request).
+- `analyze` tool's `domain` enum now includes `symmetry`. README gained a
+  "Connect from Claude Code / an IDE" MCP section.
+
 ### Two new composite skills
 - `skill_symmetry_overview` (structure): the full symmetry picture of a CIF in
   one call — space group + Wyckoff, maximal subgroups (transition pathways, with

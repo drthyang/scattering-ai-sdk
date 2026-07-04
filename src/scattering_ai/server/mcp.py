@@ -14,6 +14,10 @@ The host model orchestrates the individual tools itself; ``analyze`` is for
 hosts that want the packaged behavior. If SCATTERING_AI_MODEL is set,
 ``analyze`` uses that OpenAI-compatible backend for interpretation; otherwise
 it runs in deterministic-only mode (no LLM inside the LLM's tool).
+
+The server also exposes MCP **resources** (the curated knowledge base + a domain
+overview) and **prompts** (a domain-guidance template and an analyze-files
+template), so a host can read the SDK's science and adopt its grounding rules.
 """
 
 from __future__ import annotations
@@ -41,7 +45,7 @@ ANALYZE_TOOL = {
         "type": "object",
         "properties": {
             "domain": {"type": "string",
-                       "enum": ["auto", "rmc", "pdf", "diffuse", "data"]},
+                       "enum": ["auto", "rmc", "pdf", "diffuse", "symmetry", "data"]},
             "question": {"type": "string"},
             "data": {
                 "type": "object",
@@ -70,6 +74,95 @@ def handle_tool_call(
     if name == "analyze":
         return _run_analyze(arguments, workspace)
     return registry.execute(name, arguments)
+
+
+# --------------------------------------------------------------- resources
+
+_DOMAINS_URI = "scattering-ai://domains"
+_KNOWLEDGE_PREFIX = "knowledge://"
+
+
+def _knowledge_root() -> Path | None:
+    from scattering_ai.rag.retriever import default_knowledge_root
+
+    root = default_knowledge_root()
+    return Path(root) if root else None
+
+
+def _domain_overview() -> dict[str, Any]:
+    from scattering_ai.domains.registry import _BUILTIN, get_domain
+
+    return {name: {"description": get_domain(name).description,
+                   "prompt_version": get_domain(name).prompt_version}
+            for name in sorted(_BUILTIN)}
+
+
+def resource_definitions() -> list[dict[str, str]]:
+    """The curated knowledge base + a domain overview, as MCP resources."""
+    resources = [{"uri": _DOMAINS_URI, "name": "domains",
+                  "description": "The SDK's domain packs and their prompt versions",
+                  "mimeType": "application/json"}]
+    root = _knowledge_root()
+    if root is not None:
+        for md in sorted(root.glob("*/*.md")):
+            first = next((ln.lstrip("# ").strip()
+                          for ln in md.read_text(errors="replace").splitlines()
+                          if ln.strip()), md.stem)
+            resources.append({
+                "uri": f"{_KNOWLEDGE_PREFIX}{md.relative_to(root).as_posix()}",
+                "name": md.stem, "description": first, "mimeType": "text/markdown"})
+    return resources
+
+
+def read_resource(uri: str) -> str:
+    """Return a resource's contents; guards against path traversal."""
+    if uri == _DOMAINS_URI:
+        return json.dumps(_domain_overview(), indent=2)
+    if uri.startswith(_KNOWLEDGE_PREFIX):
+        root = _knowledge_root()
+        if root is None:
+            raise ValueError("no knowledge base is configured")
+        target = (root / uri[len(_KNOWLEDGE_PREFIX):]).resolve()
+        if root.resolve() not in target.parents or not target.is_file():
+            raise ValueError(f"unknown or unsafe resource: {uri}")
+        return target.read_text(errors="replace")
+    raise ValueError(f"unknown resource: {uri}")
+
+
+# ----------------------------------------------------------------- prompts
+
+
+def prompt_definitions() -> list[dict[str, Any]]:
+    return [
+        {"name": "domain_guidance",
+         "description": "The grounding rules / system prompt for a technique "
+         "domain (rmc, pdf, diffuse, symmetry, data) — adopt the SDK's discipline.",
+         "arguments": [{"name": "domain", "description": "domain name", "required": True}]},
+        {"name": "analyze_files",
+         "description": "Draft a request to run the SDK's `analyze` tool on data files.",
+         "arguments": [
+             {"name": "files", "description": "comma-separated file paths", "required": True},
+             {"name": "question", "description": "the scientific question", "required": False}]},
+    ]
+
+
+def get_prompt(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Return {description, messages:[{role, content}]} for a named prompt."""
+    if name == "domain_guidance":
+        from scattering_ai.domains.registry import get_domain
+
+        pack = get_domain(arguments["domain"])
+        return {"description": f"{pack.name} domain guidance ({pack.prompt_version})",
+                "messages": [{"role": "user", "content": pack.system_prompt}]}
+    if name == "analyze_files":
+        files = [f.strip() for f in arguments["files"].split(",") if f.strip()]
+        question = arguments.get("question") or "Analyze these files and report what you find."
+        content = (f"Call the `analyze` tool with data={{'files': {files}}} and "
+                   f"question='{question}'. Let the SDK auto-route the domain, then "
+                   "summarize the report's conclusion, figures, and provenance.")
+        return {"description": "analyze files via the SDK",
+                "messages": [{"role": "user", "content": content}]}
+    raise ValueError(f"unknown prompt: {name}")
 
 
 def _run_analyze(arguments: dict[str, Any], workspace: Path) -> dict[str, Any]:
@@ -128,6 +221,32 @@ def serve(workspace: str | Path | None = None) -> None:
     async def _call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         result = handle_tool_call(registry, name, arguments or {}, workspace)
         return [types.TextContent(type="text", text=json.dumps(result, default=str))]
+
+    @server.list_resources()
+    async def _list_resources() -> list[types.Resource]:
+        return [types.Resource(uri=r["uri"], name=r["name"],
+                               description=r["description"], mimeType=r["mimeType"])
+                for r in resource_definitions()]
+
+    @server.read_resource()
+    async def _read_resource(uri) -> str:
+        return read_resource(str(uri))
+
+    @server.list_prompts()
+    async def _list_prompts() -> list[types.Prompt]:
+        return [types.Prompt(
+            name=p["name"], description=p["description"],
+            arguments=[types.PromptArgument(**a) for a in p["arguments"]])
+            for p in prompt_definitions()]
+
+    @server.get_prompt()
+    async def _get_prompt(name: str, arguments: dict | None) -> types.GetPromptResult:
+        p = get_prompt(name, arguments or {})
+        return types.GetPromptResult(
+            description=p["description"],
+            messages=[types.PromptMessage(
+                role=m["role"], content=types.TextContent(type="text", text=m["content"]))
+                for m in p["messages"]])
 
     async def _run() -> None:
         async with stdio_server() as (read_stream, write_stream):

@@ -101,10 +101,30 @@ from scattering_ai.connectors.rmc_monitor import analyze_monitor   # apps own ze
 report = analyze_monitor(monitor_json)
 ```
 
+### MCP server
+
+Expose the SDK to any MCP host (Claude Code, IDEs, other assistants):
+
+```bash
+pip install -e ".[mcp]"
+claude mcp add scattering-ai -- scattering-ai mcp     # Claude Code
+```
+
+For a generic host, register the stdio command `scattering-ai mcp` (JSON form):
+
+```json
+{ "mcpServers": { "scattering-ai": { "command": "scattering-ai", "args": ["mcp"] } } }
+```
+
+The host then gets, all from the same tested core:
+- **Tools** — every SDK tool + skill 1:1, plus a high-level `analyze` (auto-routes and returns a provenance-carrying report). Set `SCATTERING_AI_MODEL` to have `analyze` use a local LLM inside the host.
+- **Resources** — the curated knowledge base (`knowledge://…`) and a `scattering-ai://domains` overview.
+- **Prompts** — `domain_guidance` (a technique's grounding rules) and `analyze_files` (a ready-to-send analysis request).
+
 **Skills** — validated multi-step workflows the agent invokes as one call,
 organized by category (`series & transitions`, `1D patterns`, `2D slices`,
-`structure`); each returns a summary, `figures`, and an audited step chain.
-See the [Quickstart](QUICKSTART.md#agent-skills).
+`structure`, `3D volumes`); each returns a summary, `figures`, and an audited
+step chain. See the [Quickstart](QUICKSTART.md#agent-skills).
 
 ## How it works
 
