@@ -23,6 +23,26 @@ OSCILLATION_AMPLITUDE = 0.005
 MIN_POINTS = 4
 
 
+# Deterministic next-check rules for RMC findings (decision D10: technique
+# content lives on the domain pack, not in core). Keyed by finding rule-key
+# (``diagnostic`` or ``diagnostic:trend``).
+NEXT_CHECK_RULES: dict[str, str] = {
+    "rwp_trend:flat": "Check the move acceptance rate; near-zero acceptance suggests "
+    "over-tight constraints, very high acceptance suggests loose dataset weights.",
+    "rwp_trend:oscillating": "Inspect dataset weights for competing datasets or "
+    "constraints pulling the configuration in opposite directions.",
+    "rwp_trend:increasing": "Check for mid-run changes to weights or constraints and "
+    "verify the restart configuration file.",
+    "dataset_kind_conflict": "Compare partial PDFs and rebalance dataset weights; a "
+    "robust local-structure signal should survive moderate weight changes.",
+    "radiation_conflict": "Identify which partial correlations dominate each probe "
+    "(neutron b vs x-ray Z weighting) and check element-specific misfit.",
+    "missing_files": "Locate or regenerate the missing files before trusting the analysis.",
+    "log_error": "Inspect the run log around the reported error line.",
+    "log_warning": "Review the warning in the run log and confirm it is benign.",
+}
+
+
 class Trend(str, Enum):
     DECREASING = "decreasing"
     FLAT = "flat"

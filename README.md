@@ -54,7 +54,16 @@ scattering-ai analyze run.json --backend lmstudio --model m --out report.md   # 
 # tool-driven analysis of a data file: the agent inspects, cuts, and fits
 scattering-ai analyze --file my_pattern.gr \
     --question "Fit the main peaks below 6 A" --backend ollama --model qwen3:32b
+
+# domain diagnostics run offline (no LLM). PDF pack checks G(r) baseline slope,
+# low-r artifacts, first-peak distance, and S(Q) vs S(Q)-1 convention:
+scattering-ai analyze --file my_pattern.gr --domain pdf --question "Healthy G(r)?"
 ```
+
+Domains: `rmc` (run health), `pdf` (total scattering / G(r) & S(Q)), and `data`
+(generic tool-driven). Each pack ships its own diagnostics, knowledge, prompt,
+and next-check rules; third parties add packs via the `scattering_ai.domains`
+entry point without touching core.
 
 Interactive chat — iterative analysis with tools and skills (history and
 artifacts persist across turns; transcript saved for provenance):

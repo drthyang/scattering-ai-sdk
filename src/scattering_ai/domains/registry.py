@@ -25,11 +25,15 @@ class DomainPack:
     knowledge_dirs: list[str] = field(default_factory=list)
     prompt_version: str = ""
     system_prompt: str = ""
+    # Deterministic "what to check next" rules for this technique, keyed by
+    # finding rule-key (``diagnostic`` or ``diagnostic:trend``). Domain content,
+    # not core logic (decision D10) — the agent merges these as an offline floor.
+    next_check_rules: dict[str, str] = field(default_factory=dict)
 
 
 def _rmc_pack() -> DomainPack:
     from scattering_ai.domains.rmc import prompts
-    from scattering_ai.domains.rmc.diagnostics import run_all
+    from scattering_ai.domains.rmc.diagnostics import NEXT_CHECK_RULES, run_all
     from scattering_ai.domains.rmc.schemas import RMCRunState
 
     def run(request: AnalysisRequest) -> list[Finding]:
@@ -42,6 +46,7 @@ def _rmc_pack() -> DomainPack:
         knowledge_dirs=["rmcprofile", "scattering"],
         prompt_version=prompts.PROMPT_VERSION,
         system_prompt=prompts.SYSTEM_PROMPT,
+        next_check_rules=NEXT_CHECK_RULES,
     )
 
 
@@ -72,12 +77,35 @@ def _data_pack() -> DomainPack:
         knowledge_dirs=["scattering"],
         prompt_version=prompts.PROMPT_VERSION,
         system_prompt=prompts.SYSTEM_PROMPT,
+        next_check_rules={
+            "missing_files": "Locate or regenerate the missing files before "
+            "trusting the analysis.",
+        },
+    )
+
+
+def _pdf_pack() -> DomainPack:
+    from scattering_ai.domains.pdf import prompts
+    from scattering_ai.domains.pdf.diagnostics import NEXT_CHECK_RULES, run_all
+
+    def run(request: AnalysisRequest) -> list[Finding]:
+        return run_all(request.data.files)
+
+    return DomainPack(
+        name="pdf",
+        description="Pair-distribution-function / total-scattering (G(r), S(Q), F(Q)) analysis",
+        run_diagnostics=run,
+        knowledge_dirs=["scattering"],
+        prompt_version=prompts.PROMPT_VERSION,
+        system_prompt=prompts.SYSTEM_PROMPT,
+        next_check_rules=NEXT_CHECK_RULES,
     )
 
 
 _BUILTIN: dict[str, Callable[[], DomainPack]] = {
     "rmc": _rmc_pack,
     "data": _data_pack,
+    "pdf": _pdf_pack,
 }
 
 

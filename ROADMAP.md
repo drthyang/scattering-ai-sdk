@@ -38,6 +38,8 @@ Decisions are recorded here so future contributors see *why*, and so any of them
 | D7 | Vertical slice before framework | Build one useful end-to-end path (RMC run health) before generalizing | Accepted (2026-07) |
 | D8 | Tools-first reprioritization | Experience with the interpretation-only RMC prototype showed limited value in commentary without action. Deterministic data-operation tools (1D fit/rebin/transform, 2D feature extraction, 3D slicing) become the center of Track B; the agent's power comes from orchestrating tools, with RAG in a supporting role. Tools are organized by data dimensionality; temperature/field dependence is a series axis over 1D/2D data, not a separate toolkit | Accepted (2026-07) |
 | D9 | numpy/scipy in core; h5py optional | Data tools are now the SDK's center, so numeric deps are core; HDF5/NeXus volume support stays an extra (`[volumes]`) for lightweight installs | Accepted (2026-07) |
+| D10 | Domain-owned next-check rules | The deterministic "what to check next" rules for a technique are domain content, not core logic; they live on the `DomainPack`, not in `core/agent.py`. Surfaced while building the first technique pack (B4): keeps the "no core reasoning changes per new pack" invariant honest and testable | Accepted (2026-07) |
+| D11 | First technique pack = PDF / total scattering | Chosen over phonons/diffuse for the first B4 pack because the tools (S(Q)→G(r), peak fitting, series) and validated real data (FeCoSn, GaTa4Se8) already exist, and it directly feeds the RMC workflow. Encodes the user's known real-data gotchas (inverted-.gr sign, NOMAD S(Q)−1 naming) as deterministic diagnostics | Accepted (2026-07) |
 
 ---
 
@@ -345,12 +347,25 @@ Track D — Trust & Quality     D1 diagnostics → D2 reports → D3 evaluation 
 #### B4 — Multi-Domain Expansion
 
 - **Goal:** Second and third domain packs, proving the plugin architecture.
-- **Candidate packs (order by user need):**
-  - **Phonons:** explain modes, identify flat branches, DOS features, spectra comparison, acoustic-mode checks; knowledge on acoustic/optical modes, eigenvectors, INS, soft modes.
+- **First pack — PDF / total scattering (active, per D11):** a `pdf` domain pack
+  built entirely on the existing tools, adding deterministic diagnostics on
+  G(r)/S(Q) files:
+  - **Low-r artifact:** significant |G(r)| below the first physical bond
+    distance = termination ripple or normalization error.
+  - **G(r) baseline slope:** near the origin G(r) must fall as −4πρr; a
+    non-negative slope flags a non-standard convention or sign inversion
+    (encodes the user's inverted neutron `.gr` gotcha).
+  - **First-peak position:** nearest-neighbour candidate, as grounding.
+  - **S(Q) convention mismatch:** a file named `S(Q)` whose high-Q tail → 0
+    actually stores S(Q)−1 (the NOMAD gotcha).
+  - **Qmax / range:** report the termination-ripple driver.
+  - Versioned prompt `pdf_interpret/v1`, curated PDF knowledge, eval cases
+    pinned to the real FeCoSn / GaTa4Se8 data.
+- **Later candidate packs (order by user need):**
+  - **Phonons:** explain modes, flat branches, DOS features, spectra comparison, acoustic-mode checks; knowledge on acoustic/optical modes, eigenvectors, INS, soft modes.
   - **Diffuse / 3D-ΔPDF:** summarize diffuse features, Bragg-punching artifacts, 3D-ΔPDF slice comparison, real-space correlation identification.
-  - **PDF / total scattering:** fit evaluation, G(r) residual comparison, local-distortion signatures, Qmax effects.
   - **Symmetry:** symmetry checks, space-group comparison, irrep constraints, allowed tensor components.
-- **Definition of Done:** a user question routes to the correct domain pack and knowledge base; adding the second pack required **no changes to core**. If it did, fix core before adding the third.
+- **Definition of Done:** a user question routes to the correct domain pack and knowledge base; adding the pack required **no changes to core reasoning** (agent loop, schemas, tool layer, report generator) — only a new pack module, its registration, and its knowledge/eval assets. If core needs a change (as D10 did), make it a general one and fix it before the next pack.
 
 ---
 
@@ -447,7 +462,7 @@ Provenance block (above) becomes mandatory in output validation; reports without
 
 ## Milestones
 
-### Milestone 1 — RMC Run Health Report *(A0 + A1 + A2 + B1 + C1 + C2 + D2)*
+### Milestone 1 — RMC Run Health Report *(A0 + A1 + A2 + B1 + C1 + C2 + D2)* — ✅ done (2026-07-03)
 
 ```text
 Input:  RMC Monitor JSON
@@ -460,7 +475,7 @@ Output: Markdown + JSON report — convergence status, fit quality, suspicious
 scattering-ai analyze path/to/rmc_monitor_summary.json --domain rmc --out report.md
 ```
 
-### Milestone 2 — Interactive RMC Assistant *(+ B2 + B3)*
+### Milestone 2 — Interactive RMC Assistant *(+ B2 + B3)* — ✅ done (2026-07-03; `chat/v3`)
 
 Chat-style interaction grounded in tools and knowledge:
 
@@ -487,26 +502,52 @@ The same SDK powers RMC Monitor, RMC Phonon Dynamics, and Neutron Diffuse Toolki
 
 ---
 
+## Current Status (2026-07-03)
+
+The tools-first foundation is **built and validated on real data**; `v0.1.0` is
+tagged and the repo is pushed. What exists now:
+
+| Track | Done | Notes |
+|-------|------|-------|
+| A — Core Runtime | A0, A1, **A2 (full tool dispatch)** | A3 multi-agent still deferred |
+| B — Domain Capability | B1 (RMC health), B2 (RAG), **B3 (1D/2D/3D + series tools, skills)** | **B4 not started — only `rmc`/`data` packs; no technique pack yet** |
+| C — Integration | C1 (Python API), C2 (CLI), C3 (FastAPI), C4 (MCP), C5 (RMC connector), C6 (NeXus/CIF adapters) | all surfaces wrap the same core |
+| D — Trust & Quality | D1 (diagnostics), D2 (reports), D3 (eval harness) | D4 provenance-*enforcement* partial (block emitted, not yet rejected on absence); D5 later |
+
+Built beyond the original slice: 18 agent tools + 3 composite skills, interactive
+chat (Milestone 2, `chat/v3`), plotting toolkit, MCP server (13 tools), and a
+**robust transition-tracing workflow** (stacked peak selection, auto-detected
+mask sentinel, per-peak monitoring summary — validated on the GaNb4Se8 39 K
+structural transition). 120 tests, CI, CHANGELOG.
+
 ## Immediate Next Actions
 
-```text
-Done (2026-07-03): A0, A1, B1, B2, minimal A2 (no tool dispatch), C1, C2, D2 —
-the RMC run health slice works end-to-end, verified against local Ollama.
+The old bottom-up tool ladder is **done**. The next frontier is proving the
+**plugin architecture with a real technique pack** (Track B4) and hardening
+trust (D4), not more one-off tools.
 
-Next (tools-first, per D8):
-1.  B3-IO: readers for the real formats in data/ (NOMAD ASCII, pdfgetx
-    .fq/.gr, MDHisto NeXus)
-2.  B3-1D: crop/rebin/background/peak-find/peak-fit/S(Q)→G(r), validated
-    against the GaTa4Se8 S(Q)+G(r) pair and FeCoSn x-ray data
-3.  B3-3D: CORELLI volume loader + axis-aligned slab slicing → 2D
-4.  A2: tool dispatch in the agent loop (LLM chooses and chains tools)
-5.  B3-2D: peak/ring/background feature extraction on slices cut from
-    the real volume; line cuts → 1D
-6.  D3: eval cases pinning known answers from the real datasets
+```text
+Next:
+1.  B4 — PDF / total-scattering domain pack (the FIRST technique pack; the
+    acceptance test for "add a domain without touching core reasoning").
+    Deterministic diagnostics on G(r)/S(Q) files: low-r artifact, G(r)
+    −4πρr baseline-slope sign (encodes the known inverted-.gr gotcha),
+    first-peak position, S(Q)-vs-S(Q)−1 convention mismatch (the NOMAD
+    gotcha), Qmax reporting. Versioned prompt pdf_interpret/v1 + curated
+    PDF knowledge + eval cases pinned to FeCoSn/GaTa4Se8 real data.
+2.  Architecture: move next-check rules out of core/agent.py into the
+    DomainPack (per the placement rule — technique content belongs in the
+    pack); each pack ships its own offline next-checks.
+3.  D4 — provenance enforcement: reports missing a complete provenance
+    block are rejected by output validation, not just annotated.
+4.  B4 second technique pack (phonons or diffuse) once PDF proves the path;
+    if it needs core changes, fix core before the third.
+5.  Chat polish: surface tracking/waterfall plot paths in the reply;
+    optional streaming.
 ```
 
-Build tools bottom-up (1D ← 2D ← 3D reduction chain); every tool must
-reproduce a known answer on real data before the agent gets to use it.
+Rule still holds: every deterministic check must reproduce a known answer on
+real data in `data/` before the agent is allowed to rely on it.
 
 ---
 

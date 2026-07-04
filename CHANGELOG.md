@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### PDF / total-scattering domain pack (B4 — first technique pack)
+- New `pdf` domain: `analyze(domain="pdf", ...)` / `scattering-ai analyze
+  --domain pdf`. Deterministic diagnostics on G(r)/S(Q)/F(Q) files, encoding
+  real-data gotchas:
+  - **G(r) baseline slope** — a non-negative low-r slope flags a non-standard
+    G(r) (RDF g(r), differential PDF, or sign inversion). Catches the known
+    inverted neutron `.gr`.
+  - **Low-r artifact** — significant |G(r)| below the first bond (~1 Å) =
+    termination ripple or normalization error, not coordination.
+  - **First-peak position** — nearest-neighbour distance candidate.
+  - **S(Q)-vs-S(Q)−1 convention mismatch** — a file named S(Q) whose high-Q
+    tail → 0 stores S(Q)−1 (the NOMAD gotcha), with the right `input_kind`.
+  - **Qmax / range** — reports the termination-ripple period.
+  - Versioned prompt `pdf_interpret/v1` and a curated PDF-conventions knowledge
+    file; validated on the real FeCoSn and GaTa4Se8 data.
+- **Architecture (D10):** deterministic next-check rules moved out of
+  `core/agent.py` onto the `DomainPack` (`next_check_rules`); the agent merges
+  them generically, so a new technique pack needs no core reasoning changes.
+
 ### Transition tracing — robustness
 - `skill_scan_series_transitions` now *monitors* the strongest peaks across the
   whole scan and reports each peak's center/FWHM/height change plus a plain

@@ -28,24 +28,6 @@ from scattering_ai.domains.registry import DomainPack, get_domain
 from scattering_ai.llm.base import LLMClient, Message
 from scattering_ai.rag.retriever import KnowledgeBase, RetrievedChunk, default_knowledge_root
 
-# Deterministic next-check rules, applied per diagnostic type when no LLM is
-# available (and merged in as a floor even when one is).
-NEXT_CHECK_RULES: dict[str, str] = {
-    "rwp_trend:flat": "Check the move acceptance rate; near-zero acceptance suggests "
-    "over-tight constraints, very high acceptance suggests loose dataset weights.",
-    "rwp_trend:oscillating": "Inspect dataset weights for competing datasets or "
-    "constraints pulling the configuration in opposite directions.",
-    "rwp_trend:increasing": "Check for mid-run changes to weights or constraints and "
-    "verify the restart configuration file.",
-    "dataset_kind_conflict": "Compare partial PDFs and rebalance dataset weights; a "
-    "robust local-structure signal should survive moderate weight changes.",
-    "radiation_conflict": "Identify which partial correlations dominate each probe "
-    "(neutron b vs x-ray Z weighting) and check element-specific misfit.",
-    "missing_files": "Locate or regenerate the missing files before trusting the analysis.",
-    "log_error": "Inspect the run log around the reported error line.",
-    "log_warning": "Review the warning in the run log and confirm it is benign.",
-}
-
 
 def _rule_key(finding: Finding) -> str:
     trend = finding.evidence.get("trend")
@@ -100,8 +82,9 @@ class Agent:
 
         observations = [f.message for f in findings]
         warnings = [f.message for f in findings if f.severity != Severity.INFO]
+        rules = pack.next_check_rules
         rule_checks = sorted(
-            {NEXT_CHECK_RULES[key] for f in findings if (key := _rule_key(f)) in NEXT_CHECK_RULES}
+            {rules[key] for f in findings if (key := _rule_key(f)) in rules}
         )
 
         summary, interpretation, llm_checks, confidence, tool_records = self._interpret(
