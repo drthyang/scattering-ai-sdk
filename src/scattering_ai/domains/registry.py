@@ -35,12 +35,36 @@ class DomainPack:
 
 
 def _rmc_pack() -> DomainPack:
+    from pathlib import Path
+
+    from scattering_ai.core.findings import Finding, Severity
     from scattering_ai.domains.rmc import prompts
     from scattering_ai.domains.rmc.diagnostics import NEXT_CHECK_RULES, run_all
     from scattering_ai.domains.rmc.schemas import RMCRunState
 
     def run(request: AnalysisRequest, workspace=None) -> list[Finding]:
-        return run_all(RMCRunState.from_analysis_data(request.data))
+        findings = run_all(RMCRunState.from_analysis_data(request.data))
+        for f in request.data.files:
+            if not str(f).lower().endswith(".rmc6f"):
+                continue
+            try:
+                from scattering_ai.tools.rmc_files import read_rmc6f
+
+                r = read_rmc6f(f)
+                findings.append(Finding(
+                    diagnostic="rmc_configuration", severity=Severity.INFO,
+                    message=f"RMCProfile configuration "
+                    f"'{r['title'] or Path(f).name}': {r['n_atoms']} atoms, "
+                    f"supercell {r['supercell']}, composition {r['composition']}, "
+                    f"average unit cell {r['cell'][:3]} Å.",
+                    evidence={k: r[k] for k in
+                              ("title", "cell", "supercell", "n_atoms", "composition")}))
+            except Exception as exc:
+                findings.append(Finding(
+                    diagnostic="rmc_unreadable", severity=Severity.WARNING,
+                    message=f"Could not read {Path(f).name}: {type(exc).__name__}: {exc}",
+                    evidence={"path": str(f)}))
+        return findings
 
     return DomainPack(
         name="rmc",

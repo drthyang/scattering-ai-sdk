@@ -186,6 +186,37 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         _save_slice(s, out_path)
         return {"saved": str(out_path), "summary": s.summary()}
 
+    def delta_pdf(path: str, apodization: str = "hann",
+                  punch_sigma: float = 6.0) -> dict:
+        from scattering_ai.tools.delta_pdf import (
+            central_slices,
+            compute_delta_pdf,
+            delta_pdf_summary,
+            punch_bragg,
+        )
+        from scattering_ai.tools.models import Slice2D
+
+        vol = load_volume(path)
+        dpdf = compute_delta_pdf(punch_bragg(vol.load_data(), n_sigma=punch_sigma),
+                                 apodization=apodization)
+        xy = central_slices(dpdf)["xy"]
+        ny, nx = xy.shape
+        s = Slice2D(data=xy,
+                    x_centers=np.arange(nx, dtype=float) - nx // 2,
+                    y_centers=np.arange(ny, dtype=float) - ny // 2,
+                    xlabel="Δ (direct-lattice steps)", ylabel="Δ (direct-lattice steps)",
+                    meta={"kind": "delta_pdf_central_xy"})
+        out = artifact("deltapdf_xy", ".npz")
+        _save_slice(s, out)
+        result = {"saved_slice": str(out), **delta_pdf_summary(dpdf)}
+        try:
+            from scattering_ai.tools.plotting import plot_slice
+
+            result["plot"] = plot_slice(s, artifact("deltapdf_xy", ".png"), log=False)
+        except ImportError:
+            pass
+        return result
+
     def find_peaks_2d(slice_path: str, min_snr: float = 10.0) -> dict:
         peaks = sl.find_peaks_2d(load_slice(slice_path), min_snr=min_snr)
         return {"n_peaks": len(peaks), "strongest": peaks[:20]}
@@ -385,6 +416,18 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         lat, pos, sp = _structure(path)
         return sym.magnetic_symmetry(lat, pos, sp, magmoms)
 
+    def read_rmc6f(path: str) -> dict:
+        from scattering_ai.tools.rmc_files import read_rmc6f as _read
+
+        r = _read(path)
+        return {k: r[k] for k in
+                ("title", "cell", "supercell", "n_atoms", "composition")}
+
+    def read_rmc_series(path: str) -> dict:
+        from scattering_ai.tools.rmc_files import read_rmc_csv
+
+        return read_rmc_csv(path)
+
     def systematic_absences(path: str, max_index: int = 6) -> dict:
         from scattering_ai.tools import symmetry as sym
 
@@ -509,6 +552,19 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "Detect 2D peaks (e.g. Bragg) in a saved slice (.npz).",
                 _params({"slice_path": string, "min_snr": number}, ["slice_path"]),
                 find_peaks_2d,
+            ),
+            AgentTool(
+                "delta_pdf",
+                "Compute the 3D difference PDF (3D-ΔPDF) of a diffuse volume: "
+                "punch out Bragg peaks, apodize, and take the centred Fourier "
+                "transform. Returns a central-plane slice + plot and the "
+                "positive/negative correlation extremes. apodization: hann/"
+                "gaussian/none.",
+                _params(
+                    {"path": string, "apodization": string, "punch_sigma": number},
+                    ["path"],
+                ),
+                delta_pdf,
             ),
             AgentTool(
                 "detect_rings_2d",
@@ -644,6 +700,20 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "mCIF. Returns the image path and a structure summary.",
                 _params({"path": string, "bonds": {"type": "boolean"}}, ["path"]),
                 plot_structure,
+            ),
+            AgentTool(
+                "read_rmc6f",
+                "Read an RMCProfile .rmc6f configuration: the average unit cell, "
+                "supercell multipliers, atom count, and composition.",
+                _params({"path": string}, ["path"]),
+                read_rmc6f,
+            ),
+            AgentTool(
+                "read_rmc_series",
+                "Read an RMCProfile CSV log (R-values / chi² vs step) into named "
+                "columns for convergence analysis.",
+                _params({"path": string}, ["path"]),
+                read_rmc_series,
             ),
             AgentTool(
                 "systematic_absences",

@@ -62,6 +62,18 @@ class Volume3D:
             "lattice": self.lattice,
         }
 
+    def load_data(self) -> np.ndarray:
+        """The full signal array in logical axis order (D0, D1, D2), masked
+        voxels as NaN. Large — for whole-volume operations like 3D-ΔPDF."""
+        import h5py
+
+        with h5py.File(self.path, "r") as f:
+            data_group = f[f"{_GROUP}/data"]
+            signal = data_group["signal"][()].astype(float)
+            if "mask" in data_group:
+                signal[data_group["mask"][()] == 1] = np.nan
+        return np.transpose(signal, (2, 1, 0))  # stored (D2,D1,D0) -> (D0,D1,D2)
+
     def slice(self, axis: int | str, center: float, thickness: float) -> Slice2D:
         """Average an axis-aligned slab into a 2D slice.
 

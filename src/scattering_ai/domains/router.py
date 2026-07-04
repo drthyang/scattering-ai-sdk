@@ -64,6 +64,9 @@ def detect_domain(request: AnalysisRequest) -> tuple[str, str]:
 
     files = [Path(f) for f in data.files]
     for p in files:
+        if p.suffix.lower() == ".rmc6f":
+            return "rmc", f"RMCProfile configuration ({p.name})"
+    for p in files:
         if p.suffix.lower() in _SYMMETRY_SUFFIXES:
             return "symmetry", f"crystal structure ({p.name})"
     for p in files:
