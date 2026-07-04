@@ -546,11 +546,19 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
   correction becomes a pinned, data-dependent regression case end-to-end (the
   GaNb4Se8 transition-temperature case runs the real `detect_transitions`).
 
-#### E6 — Capture everywhere (next)
+#### E6 — Capture everywhere (in progress)
 
 - **Goal:** widen capture so more of real use becomes signal. Chat turns
   (tool errors, dead-ends, repeated reformulations), MCP/connector calls, and
   tool-level failures join the analyze journal — same redaction rules.
+- **Done (2026-07):** `ChatSession` journals a redacted episode for every
+  *signal-bearing* turn — a tool errored (→ error finding keyed by tool name) or
+  the model produced no reply (→ dead-end via `interpretation_available`); clean
+  turns are not captured. `empty_result` was scoped to `analyze` so chat turns
+  don't trip it. Opt-in and best-effort; arguments/results never enter the
+  journal (redaction test on the chat path).
+- **Remaining:** MCP-server and app-connector call capture; cross-turn
+  "repeated reformulation" detection.
 - **DoD:** a stuck chat session and a failing tool call both surface in
   `learn signals` and can seed a correction or proposal.
 

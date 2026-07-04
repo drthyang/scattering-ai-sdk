@@ -74,7 +74,8 @@ class ChatSession:
         self.registry = default_toolkit(self.workspace)
         self.on_tool_call = on_tool_call  # callback(name, args, result) for UIs
         self.tool_trace: list[dict] = []
-        self.journal = journal  # opt-in self-improvement journal (P1/P2)
+        self.journal = journal  # opt-in self-improvement journal (P1/P2/E6)
+        self.files = list(files or [])
         self.session_id = "chat-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
 
         context = ""
@@ -105,6 +106,7 @@ class ChatSession:
 
     def turn(self, user_text: str) -> str:
         """One conversational turn: user text in, grounded assistant text out."""
+        trace_start = len(self.tool_trace)
         self.messages.append(Message(role="user", content=user_text))
         response = self.llm.complete(self.messages, tools=self.registry.specs)
         rounds = 0
@@ -131,7 +133,34 @@ class ChatSession:
         reply = response.content.strip()
         self.messages.append(Message(role="assistant", content=reply))
         self._save_transcript()
+        self._journal_turn(self.tool_trace[trace_start:], reply)
         return reply
+
+    def _journal_turn(self, turn_tools: list[dict], reply: str) -> None:
+        """Capture a redacted episode for a signal-bearing chat turn (E6).
+
+        Opt-in and best-effort — a journaling failure never affects the chat.
+        Only turns that reveal something (a tool errored, or the model produced
+        no reply — a dead-end) are recorded; clean turns are not signals.
+        """
+        from scattering_ai.learning.journal import (
+            Journal,
+            episode_from_chat,
+            resolve_journal_dir,
+        )
+
+        directory = resolve_journal_dir(self.journal)
+        if directory is None:
+            return
+        errored = any(t.get("error") for t in turn_tools)
+        if not errored and reply:
+            return  # nothing worth capturing
+        try:
+            Journal(directory).record(
+                episode_from_chat(self.session_id, self.model_id, turn_tools,
+                                  reply, self.files))
+        except Exception:
+            pass
 
     def record_correction(self, target: str, statement: str,
                           corrected_value: str = "", domain: str = ""):

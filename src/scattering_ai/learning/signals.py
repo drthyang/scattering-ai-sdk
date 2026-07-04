@@ -104,7 +104,9 @@ def signals_for_episode(ep: Episode) -> list[Signal]:
     if ep.model and not ep.interpretation_available:
         add("interpretation_unavailable", "medium", domain_key)
 
-    if not ep.findings and ep.n_figures == 0:
+    # "Empty result" is an analysis concept — a diagnostics run that produced
+    # nothing. A chat turn legitimately has no findings/figures, so don't fire.
+    if ep.surface == "analyze" and not ep.findings and ep.n_figures == 0:
         add("empty_result", "medium", domain_key)
 
     return out

@@ -156,3 +156,74 @@ def test_chat_correction_requires_journal(tmp_path):
     session = ChatSession(llm=ScriptedLLM([]), workspace=tmp_path / "ws")
     with pytest.raises(RuntimeError):
         session.record_correction(target="domain", statement="wrong route")
+
+
+# --- E6: capture everywhere (chat-turn journaling) ----------------------------
+
+def test_chat_journals_tool_failure_turn_redacted(tmp_path):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "j"
+    llm = ScriptedLLM([
+        LLMResponse(tool_calls=[ToolCall(name="no_such_tool",
+                                         arguments={"secretkey": "/private/data.dat"},
+                                         id="a")]),
+        LLMResponse(content="I couldn't run that tool."),
+    ])
+    session = ChatSession(llm=llm, model_id="m", workspace=tmp_path / "ws",
+                          journal=jdir, files=["/private/data.dat"])
+    session.turn("do the thing")
+
+    eps = Journal(jdir).episodes()
+    assert len(eps) == 1
+    ep = eps[0]
+    assert ep.surface == "chat" and ep.outcome == "error"
+    assert any(f.diagnostic == "no_such_tool" and f.severity == "error"
+               for f in ep.findings)
+    # redaction: tool arguments and full data paths never enter the journal
+    raw = Journal(jdir).path.read_text()
+    assert "secretkey" not in raw and "/private/data.dat" not in raw
+    assert "data.dat" in raw  # only the basename is kept (file_names)
+
+
+def test_chat_clean_turn_is_not_journaled(tmp_path):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "j"
+    session = ChatSession(llm=ScriptedLLM([LLMResponse(content="Here is the answer.")]),
+                          model_id="m", workspace=tmp_path / "ws", journal=jdir)
+    session.turn("hi")
+    assert Journal(jdir).episodes() == []  # no error, has reply -> not a signal
+
+
+def test_chat_dead_end_no_reply_is_captured(tmp_path):
+    from scattering_ai.learning.journal import Journal
+
+    jdir = tmp_path / "j"
+    session = ChatSession(llm=ScriptedLLM([LLMResponse(content="")]),
+                          model_id="m", workspace=tmp_path / "ws", journal=jdir)
+    session.turn("?")
+    eps = Journal(jdir).episodes()
+    assert len(eps) == 1 and eps[0].interpretation_available is False
+
+
+def test_chat_failure_surfaces_as_signal_not_empty_result(tmp_path):
+    from scattering_ai.learning.journal import Journal
+    from scattering_ai.learning.signals import signals_report
+
+    jdir = tmp_path / "j"
+    ChatSession(
+        llm=ScriptedLLM([
+            LLMResponse(tool_calls=[ToolCall(name="no_such_tool", arguments={}, id="a")]),
+            LLMResponse(content="failed")]),
+        model_id="m", workspace=tmp_path / "ws", journal=jdir).turn("x")
+    types = {c["type"] for c in signals_report(Journal(jdir))["clusters"]}
+    assert "error_outcome" in types
+    assert "empty_result" not in types  # chat turns must not trip empty_result
+
+
+def test_chat_journaling_off_by_default(tmp_path):
+    session = ChatSession(llm=ScriptedLLM([LLMResponse(content="")]),
+                          model_id="m", workspace=tmp_path / "ws")  # no journal
+    session.turn("?")
+    assert not list(tmp_path.glob("**/episodes.jsonl"))
