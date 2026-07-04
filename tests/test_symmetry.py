@@ -213,3 +213,16 @@ def test_registry_symmetry_tools(tmp_path):
     tree = reg.execute("subgroup_tree", {"path": str(p)})
     assert 123 in {s["number"] for s in tree["subgroups"]}
     assert tree["plot"].endswith(".png")
+
+
+def test_skill_symmetry_overview(tmp_path):
+    p = tmp_path / "perov.cif"
+    p.write_text(PEROV_CIF)
+    reg = default_toolkit(tmp_path / "ws")
+    out = reg.execute("skill_symmetry_overview", {"path": str(p)})
+    assert "Pm-3m" in out["summary"]
+    assert out["space_group"]["number"] == 221
+    assert 123 in {s["number"] for s in out["maximal_subgroups"]}  # P4/mmm pathway
+    assert out["centering"] == "P" and out["n_allowed_reflections"] > 0
+    assert out["figures"] and out["figures"][0].endswith("subgroup_tree.png")
+    assert out["step_errors"] == 0

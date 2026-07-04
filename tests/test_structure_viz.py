@@ -98,7 +98,8 @@ def test_visualize_structure_skill_magnetic(tmp_path):
 def test_skills_are_categorized(tmp_path):
     reg = default_toolkit(tmp_path / "ws")
     cats = reg.skills_by_category()
-    assert cats["structure"] == ["skill_visualize_structure"]
+    assert cats["structure"] == ["skill_symmetry_overview", "skill_visualize_structure"]
     assert cats["series & transitions"] == ["skill_scan_series_transitions"]
     assert cats["1D patterns"] == ["skill_fit_pattern_peaks"]
     assert cats["2D slices"] == ["skill_characterize_slice"]
+    assert cats["3D volumes"] == ["skill_delta_pdf"]

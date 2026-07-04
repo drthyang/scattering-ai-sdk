@@ -55,6 +55,13 @@ def test_central_slices_and_summary():
     assert s["shape"] == [12, 10, 8] and s["max_positive"] >= s["max_negative"]
 
 
+def test_delta_pdf_skill_is_registered_in_volumes_category(tmp_path):
+    from scattering_ai.tools.registry import default_toolkit
+
+    cats = default_toolkit(tmp_path / "ws").skills_by_category()
+    assert cats["3D volumes"] == ["skill_delta_pdf"]
+
+
 @pytest.mark.skipif(VOLUME is None, reason="CORELLI volume not present")
 def test_delta_pdf_tool_on_real_volume(tmp_path):
     pytest.importorskip("h5py")
@@ -66,3 +73,17 @@ def test_delta_pdf_tool_on_real_volume(tmp_path):
     assert "error" not in out
     assert Path(out["saved_slice"]).exists() and Path(out["plot"]).exists()
     assert out["max_positive"] >= out["max_negative"]
+
+
+@pytest.mark.skipif(VOLUME is None, reason="CORELLI volume not present")
+def test_delta_pdf_skill_on_real_volume(tmp_path):
+    pytest.importorskip("h5py")
+    pytest.importorskip("matplotlib")
+    from scattering_ai.tools.registry import default_toolkit
+
+    reg = default_toolkit(tmp_path / "ws")
+    out = reg.execute("skill_delta_pdf", {"path": str(VOLUME), "punch_sigma": 8.0})
+    assert out["step_errors"] == 0
+    assert "3D-ΔPDF" in out["summary"]
+    assert out["figures"] and out["figures"][0].endswith(".png")
+    assert "max_positive" in out["extremes"]

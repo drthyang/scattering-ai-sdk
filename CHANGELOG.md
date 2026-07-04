@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Two new composite skills
+- `skill_symmetry_overview` (structure): the full symmetry picture of a CIF in
+  one call — space group + Wyckoff, maximal subgroups (transition pathways, with
+  a tree figure), pseudosymmetric parent, and reflection conditions.
+- `skill_delta_pdf` (new `3D volumes` category): 3D-ΔPDF of a diffuse volume
+  (punch → apodize → centred FFT) plus its strongest real-space correlations and
+  a central-plane plot.
+
 ### New technique tools (symmetry + ported from sibling repos)
 - **Symmetry:** `systematic_absences` (symmetry-allowed reflections / extinction
   conditions — a symmetry-filtered Bragg checklist) and `standardize_cell`

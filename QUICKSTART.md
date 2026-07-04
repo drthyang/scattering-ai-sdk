@@ -75,6 +75,8 @@ The built-in skills, grouped by category (see `registry.skills_by_category()`):
 | 1D patterns | `skill_fit_pattern_peaks` | Fit the peaks (with uncertainties) | fit + residual |
 | 2D slices | `skill_characterize_slice` | What's in this 2D slice? | slice map + ring profile |
 | structure | `skill_visualize_structure` | Show this crystal structure (CIF/mCIF) | unit cell + moments |
+| structure | `skill_symmetry_overview` | Space group + subgroups + transitions | subgroup tree |
+| 3D volumes | `skill_delta_pdf` | 3D-ΔPDF + real-space correlations | central-plane ΔPDF |
 
 Individual tools are called the same way — e.g. crystallographic symmetry from a
 CIF (needs the `symmetry` extra):
