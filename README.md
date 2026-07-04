@@ -59,7 +59,7 @@ cfg = SDKConfig.ollama(model="qwen3:32b")       # or .lm_studio() / .openai() / 
 agent = Agent(llm=OpenAICompatibleClient(cfg), model_id=f"ollama:{cfg.model}")
 report = agent.analyze(AnalysisRequest(
     question="Is there a phase transition across temperature?",
-    data={"files": ["scan_T_5K.dat", "scan_T_50K.dat", "..."]},
+    data={"files": ["scans/"]},                 # a folder or glob of the T-series
 ))
 ```
 
@@ -87,7 +87,7 @@ without touching core.
 ## Other interfaces
 
 ```bash
-scattering-ai chat --backend ollama --model qwen3:32b --file data/1d/series/*.dat
+scattering-ai chat --backend ollama --model qwen3:32b --file 'data/1d/series/*.dat'
 scattering-ai plot my_pattern.gr --fit "2.64,3.73"     # quick-look plots (peaks/fits/slices/series)
 scattering-ai serve --port 8551                        # HTTP API ([api] extra)
 claude mcp add scattering-ai -- scattering-ai mcp      # expose tools to any MCP host

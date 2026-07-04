@@ -86,7 +86,7 @@ def _run_chat(args: argparse.Namespace) -> int:
         llm=agent.llm,
         model_id=agent.model_id,
         workspace=args.workspace or None,
-        files=args.file or None,
+        files=_expand_files(args.file) if args.file else None,
         on_tool_call=lambda name, arguments, result: print(
             f"  ⚙ {name}({', '.join(f'{k}={v}' for k, v in list(arguments.items())[:3])})"
             + (f"  ✗ {result['error']}" if result.get("error") else "")
