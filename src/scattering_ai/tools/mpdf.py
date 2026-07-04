@@ -263,3 +263,103 @@ def powder_magnetic_iq(lattice, positions, spins, qmin: float = 0.1,
             else f"<j0> {ion}",
             "note": "powder magnetic diffuse I(Q); ordered structures give "
             "broadened magnetic Bragg peaks (broadening set by rmax)"}
+
+
+# High-symmetry propagation-vector candidates scanned when k is not given.
+_K_CANDIDATES = [
+    (0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 0.0, 0.5),
+    (0.5, 0.5, 0.0), (0.5, 0.0, 0.5), (0.0, 0.5, 0.5), (0.5, 0.5, 0.5),
+    (1.0, 1.0, 1.0), (1.0, 0.0, 0.0),
+]
+
+
+def kvector_consistency(lattice, positions, spins, k=None, rmax: float = 10.0,
+                        shell_tol: float = 0.05) -> dict[str, Any]:
+    """Test whether shell correlations match a propagation vector's ideal
+    pattern cos(2π k·ΔR) — or find the best-matching high-symmetry k.
+
+    A single-k (collinear) magnetic structure has ⟨Ŝ_i·Ŝ_j⟩ = cos(2π k·ΔR_frac)
+    for every pair. Ordered structures match one k almost exactly; geometrically
+    frustrated / short-range-ordered configurations match NO k and their
+    correlations decay with distance — the signature this flags.
+    """
+    from scattering_ai.tools.symmetry import cell_matrix
+
+    lattice = np.asarray(lattice, dtype=float)
+    cell = lattice if lattice.shape == (3, 3) else cell_matrix(*lattice)
+    frac = np.asarray(positions, dtype=float)
+    spin = np.asarray(spins, dtype=float) @ (cell / np.linalg.norm(cell, axis=1)[:, None])
+    norms = np.linalg.norm(spin, axis=1)
+    magnetic = norms > 1e-8
+    if magnetic.sum() < 2:
+        return {"error": "need at least two atoms with non-zero moments"}
+    frac, unit = frac[magnetic], spin[magnetic] / norms[magnetic][:, None]
+    n_mag = len(frac)
+
+    n_rep = [int(np.ceil(rmax / np.linalg.norm(cell[i]))) + 1 for i in range(3)]
+    shifts = np.array([[i, j, kk]
+                       for i in range(-n_rep[0], n_rep[0] + 1)
+                       for j in range(-n_rep[1], n_rep[1] + 1)
+                       for kk in range(-n_rep[2], n_rep[2] + 1)], dtype=float)
+    all_frac = (frac[None, :, :] + shifts[:, None, :]).reshape(-1, 3)
+    all_cart = all_frac @ cell
+    all_unit = np.tile(unit, (len(shifts), 1))
+    cart0 = frac @ cell
+
+    dists, dots, dfrac = [], [], []
+    for i in range(n_mag):
+        d = np.linalg.norm(all_cart - cart0[i], axis=1)
+        keep = (d > 1e-6) & (d < rmax)
+        dists += list(d[keep])
+        dots += list(all_unit[keep] @ unit[i])
+        dfrac += list(all_frac[keep] - frac[i])
+    dists, dots, dfrac = np.asarray(dists), np.asarray(dots), np.asarray(dfrac)
+    order = np.argsort(dists)
+    dists, dots, dfrac = dists[order], dots[order], dfrac[order]
+
+    # shell boundaries
+    bounds = [0]
+    for m in range(1, len(dists)):
+        if dists[m] - dists[bounds[-1]] > shell_tol:
+            bounds.append(m)
+    bounds.append(len(dists))
+
+    def score(kvec) -> tuple[float, list[dict[str, Any]]]:
+        ideal_pair = np.cos(2 * np.pi * (dfrac @ np.asarray(kvec, dtype=float)))
+        shells, sq = [], []
+        for a, b in zip(bounds[:-1], bounds[1:], strict=True):
+            measured = float(dots[a:b].mean())
+            ideal = float(ideal_pair[a:b].mean())
+            shells.append({"r": round(float(dists[a:b].mean()), 4),
+                           "measured": round(measured, 4), "ideal": round(ideal, 4)})
+            sq.append((measured - ideal) ** 2)
+        return float(np.sqrt(np.mean(sq))), shells
+
+    if k is not None:
+        rms, shells = score(k)
+        best_k, best_rms, best_shells = tuple(k), rms, shells
+        scanned = None
+    else:
+        scanned = []
+        best_k, best_rms, best_shells = None, np.inf, []
+        for cand in _K_CANDIDATES:
+            rms, shells = score(cand)
+            scanned.append({"k": list(cand), "rms": round(rms, 4)})
+            if rms < best_rms:
+                best_k, best_rms, best_shells = cand, rms, shells
+
+    # decay of |correlation| with r — short-range signature
+    absc = [abs(s["measured"]) for s in best_shells]
+    n_half = max(len(absc) // 2, 1)
+    decaying = bool(np.mean(absc[:n_half]) > 2 * np.mean(absc[n_half:]) + 0.05)
+    ordered = best_rms < 0.15
+    return {
+        "k": list(best_k) if best_k is not None else None,
+        "rms": round(best_rms, 4),
+        "ordered": ordered,
+        "short_range": bool(not ordered and decaying),
+        "shells": best_shells[:12],
+        "k_scan": scanned,
+        "note": "ordered: shell correlations match cos(2πk·ΔR); short_range: no "
+        "k fits and |correlation| decays with r (frustration signature)",
+    }

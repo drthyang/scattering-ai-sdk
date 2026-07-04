@@ -47,16 +47,63 @@ def magnetic_diffuse(registry: ToolRegistry, path: str, rmax: float = 20.0,
     )
 
 
+def frustration_check(registry: ToolRegistry, path: str,
+                      k: list[float] | None = None) -> dict[str, Any]:
+    """Is the spin arrangement a single-k ordered structure, or does it show a
+    short-range / frustration signature? Compares shell correlations against
+    propagation-vector patterns."""
+    run = SkillRun(registry)
+    check = run.call("kvector_check_from_mcif", path=path, k=k)
+    if "error" in check:
+        return run.finish(error=check["error"])
+    corr = run.call("spin_correlations_from_mcif", path=path)
+
+    if check["ordered"]:
+        summary = (f"Ordered single-k magnetic structure: shell correlations "
+                   f"match k = {check['k']} (rms {check['rms']:g}).")
+    elif check["short_range"]:
+        summary = ("No propagation vector reproduces the shell correlations and "
+                   "|⟨Ŝ·Ŝ⟩| decays with distance — a short-range / geometric "
+                   f"frustration signature (best k {check['k']}, rms {check['rms']:g}).")
+    else:
+        summary = (f"No single k matches (best {check['k']}, rms {check['rms']:g}) "
+                   "and correlations do not simply decay — possibly multi-k, "
+                   "incommensurate, or weakly correlated.")
+    return run.finish(
+        summary=summary,
+        ordered=check["ordered"],
+        short_range=check["short_range"],
+        best_k=check["k"],
+        rms=check["rms"],
+        shells=check["shells"][:8],
+        k_scan=check.get("k_scan"),
+        correlation_shells=corr.get("shells", [])[:8] if "error" not in corr else [],
+    )
+
+
 def skills(registry: ToolRegistry) -> list[AgentTool]:
     number = {"type": "number"}
-    return [AgentTool(
-        "skill_magnetic_diffuse",
-        "SKILL (composite workflow): the local-magnetism picture of a magnetic "
-        "structure (mCIF) in one call — magnetic PDF, spin-pair correlations per "
-        "neighbour shell, and powder magnetic diffuse I(Q), with figures. Prefer "
-        "this for 'analyze the magnetism / magnetic correlations' questions.",
-        _params({"path": {"type": "string"}, "rmax": number, "ion": {"type": "string"}},
-                ["path"]),
-        lambda **kw: magnetic_diffuse(registry, **kw),
-        category=CATEGORY,
-    )]
+    string = {"type": "string"}
+    return [
+        AgentTool(
+            "skill_magnetic_diffuse",
+            "SKILL (composite workflow): the local-magnetism picture of a magnetic "
+            "structure (mCIF) in one call — magnetic PDF, spin-pair correlations per "
+            "neighbour shell, and powder magnetic diffuse I(Q), with figures. Prefer "
+            "this for 'analyze the magnetism / magnetic correlations' questions.",
+            _params({"path": string, "rmax": number, "ion": string}, ["path"]),
+            lambda **kw: magnetic_diffuse(registry, **kw),
+            category=CATEGORY,
+        ),
+        AgentTool(
+            "skill_frustration_check",
+            "SKILL (composite workflow): is this magnetic structure single-k "
+            "ordered, or frustrated/short-range? Compares shell correlations to "
+            "propagation-vector patterns (pass k or let it scan high-symmetry "
+            "candidates) and reports the verdict with the per-shell evidence.",
+            _params({"path": string,
+                     "k": {"type": ["array", "null"], "items": number}}, ["path"]),
+            lambda **kw: frustration_check(registry, **kw),
+            category=CATEGORY,
+        ),
+    ]

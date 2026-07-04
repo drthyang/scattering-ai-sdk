@@ -639,8 +639,9 @@ T4. Spinteract-style interaction refinement (J's from diffuse data via
 Agent skills:
 S1. skill_magnetic_diffuse (built 2026-07): mCIF → mPDF + spin correlations +
     powder I(Q) in one call, with figures.
-S2. skill_frustration_check: shell correlations vs a k-vector's ideal pattern
-    (flags geometric frustration signatures).
+S2. skill_frustration_check (built 2026-07): shell correlations vs a
+    k-vector's ideal pattern cos(2πk·ΔR); names the ordered k or flags a
+    short-range / frustration signature.
 Diffuse (non-magnetic) additions:
 S3. punch-and-fill for delta_pdf (backfill punched voxels before FFT) and
     Laue-symmetry averaging of slices/volumes (Meerkat-flavoured).

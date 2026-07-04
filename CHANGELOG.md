@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Frustration / k-vector check
+- **`kvector_check_from_mcif`** + **`skill_frustration_check`**: is the spin
+  arrangement a single-k ordered structure? Shell correlations are compared to
+  the propagation vector's ideal pattern cos(2πk·ΔR) — pass k, or scan
+  high-symmetry candidates. Ordered structures name their k (CsCl-type AFM →
+  k=(1,1,1) with rms 0, FM → k=0); no matching k with decaying correlations
+  flags a short-range / geometric-frustration signature.
+
 ### Powder magnetic I(Q) + skill_magnetic_diffuse
 - **`powder_magnetic_iq_from_mcif`**: powder-averaged magnetic diffuse
   scattering I(Q) from a spin structure — the Blech–Averbach spherical average

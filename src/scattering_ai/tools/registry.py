@@ -533,6 +533,17 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
             return {"error": f"{path} has no magnetic moments (_atom_site_moment loop)"}
         return spin_correlations(s["lattice"], s["positions"], s["moments"], rmax=rmax)
 
+    def kvector_check_from_mcif(path: str, k: list[float] | None = None,
+                                rmax: float = 10.0) -> dict:
+        from scattering_ai.tools.cif import read_structure
+        from scattering_ai.tools.mpdf import kvector_consistency
+
+        s = read_structure(path)
+        if not s.get("moments"):
+            return {"error": f"{path} has no magnetic moments (_atom_site_moment loop)"}
+        return kvector_consistency(s["lattice"], s["positions"], s["moments"],
+                                   k=k, rmax=rmax)
+
     def read_rmc6f(path: str) -> dict:
         from scattering_ai.tools.rmc_files import read_rmc6f as _read
 
@@ -902,6 +913,21 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "magnetic Bragg peaks. Saves the curve + plot.",
                 _params({"path": string, "qmax": number, "ion": string}, ["path"]),
                 powder_magnetic_iq_from_mcif,
+            ),
+            AgentTool(
+                "kvector_check_from_mcif",
+                "Test whether a magnetic structure's shell correlations match a "
+                "propagation vector's ideal pattern cos(2πk·ΔR) — pass k, or omit "
+                "it to scan high-symmetry candidates. ordered=true names the k; "
+                "no matching k with decaying correlations flags short-range / "
+                "frustrated order.",
+                _params(
+                    {"path": string,
+                     "k": {"type": ["array", "null"], "items": number},
+                     "rmax": number},
+                    ["path"],
+                ),
+                kvector_check_from_mcif,
             ),
             AgentTool(
                 "spin_correlations_from_mcif",

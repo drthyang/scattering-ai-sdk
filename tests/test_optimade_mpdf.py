@@ -177,4 +177,59 @@ Mn2 0.0 0.0 -4.0
     assert out["form_factor"] == "<j0> Mn2"
     assert len([f for f in out["figures"] if f.endswith(".png")]) == 2
     cats = reg.skills_by_category()
-    assert cats["magnetic"] == ["skill_magnetic_diffuse"]
+    assert "skill_magnetic_diffuse" in cats["magnetic"]
+
+
+def test_kvector_consistency_known_answers():
+    from scattering_ai.tools.mpdf import kvector_consistency
+
+    afm = kvector_consistency(spins=[[0, 0, 3], [0, 0, -3]], **CSCL)
+    assert afm["ordered"] and afm["k"] == [1.0, 1.0, 1.0] and afm["rms"] < 0.01
+    fm = kvector_consistency(spins=[[0, 0, 3], [0, 0, 3]], **CSCL)
+    assert fm["ordered"] and fm["k"] == [0.0, 0.0, 0.0]
+    # explicit wrong k scores badly
+    wrong = kvector_consistency(spins=[[0, 0, 3], [0, 0, -3]], k=[0, 0, 0], **CSCL)
+    assert not wrong["ordered"] and wrong["rms"] > 0.5
+    # random spins: no single k fits
+    rng = np.random.default_rng(2)
+    pos = [[i / 4, j / 4, k / 4] for i in range(4) for j in range(4) for k in range(4)]
+    rnd = kvector_consistency([8.0] * 3 + [90] * 3, pos, rng.normal(size=(64, 3)), rmax=6)
+    assert not rnd["ordered"]
+
+
+def test_skill_frustration_check(tmp_path):
+    from scattering_ai.tools.registry import default_toolkit
+
+    mcif = tmp_path / "afm.mcif"
+    mcif.write_text("""data_MnAFM
+_cell_length_a 4.0
+_cell_length_b 4.0
+_cell_length_c 4.0
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Mn1 Mn 0.0 0.0 0.0
+Mn2 Mn 0.5 0.5 0.5
+loop_
+_atom_site_moment.label
+_atom_site_moment.crystalaxis_x
+_atom_site_moment.crystalaxis_y
+_atom_site_moment.crystalaxis_z
+Mn1 0.0 0.0 4.0
+Mn2 0.0 0.0 -4.0
+""")
+    reg = default_toolkit(tmp_path / "ws")
+    out = reg.execute("skill_frustration_check", {"path": str(mcif)})
+    assert out["step_errors"] == 0
+    assert out["ordered"] and out["best_k"] == [1.0, 1.0, 1.0]
+    assert "Ordered single-k" in out["summary"]
+    # per-shell evidence: measured matches ideal
+    assert all(abs(s["measured"] - s["ideal"]) < 0.01 for s in out["shells"])
+    assert reg.skills_by_category()["magnetic"] == [
+        "skill_frustration_check", "skill_magnetic_diffuse"]
