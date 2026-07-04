@@ -98,3 +98,60 @@ def simulate_mpdf(lattice, positions, spins, rmax: float = 20.0,
     return {"r": r, "f": f, "n_magnetic": n_mag, "sigma": sigma,
             "note": "ideal mPDF (arbitrary scale); negative peaks = "
             "antiferromagnetically correlated pair distances"}
+
+
+def spin_correlations(lattice, positions, spins, rmax: float = 12.0,
+                      shell_tol: float = 0.05) -> dict[str, Any]:
+    """Normalized spin-pair correlations ⟨Ŝ_i·Ŝ_j⟩ per neighbour shell.
+
+    The real-space fingerprint of a magnetic configuration (what
+    spinvert-style analyses report): +1 = shell fully ferromagnetically
+    correlated, −1 = antiferromagnetic, 0 = uncorrelated. Works for ordered
+    (mCIF) or disordered (RMC-style) spin sets.
+    """
+    from scattering_ai.tools.symmetry import cell_matrix
+
+    lattice = np.asarray(lattice, dtype=float)
+    cell = lattice if lattice.shape == (3, 3) else cell_matrix(*lattice)
+    frac = np.asarray(positions, dtype=float)
+    spin = np.asarray(spins, dtype=float) @ (cell / np.linalg.norm(cell, axis=1)[:, None])
+    norms = np.linalg.norm(spin, axis=1)
+    magnetic = norms > 1e-8
+    if magnetic.sum() < 2:
+        return {"error": "need at least two atoms with non-zero moments"}
+    frac, unit = frac[magnetic], spin[magnetic] / norms[magnetic][:, None]
+    n_mag = len(frac)
+
+    n_rep = [int(np.ceil(rmax / np.linalg.norm(cell[i]))) + 1 for i in range(3)]
+    shifts = np.array([[i, j, k]
+                       for i in range(-n_rep[0], n_rep[0] + 1)
+                       for j in range(-n_rep[1], n_rep[1] + 1)
+                       for k in range(-n_rep[2], n_rep[2] + 1)], dtype=float)
+    cart0 = frac @ cell
+    all_cart = (frac[None, :, :] + shifts[:, None, :]).reshape(-1, 3) @ cell
+    all_unit = np.tile(unit, (len(shifts), 1))
+
+    dists: list[float] = []
+    dots: list[float] = []
+    for i in range(n_mag):
+        d = np.linalg.norm(all_cart - cart0[i], axis=1)
+        keep = (d > 1e-6) & (d < rmax)
+        dists += list(d[keep])
+        dots += list(all_unit[keep] @ unit[i])
+    dists = np.asarray(dists)
+    dots = np.asarray(dots)
+
+    order = np.argsort(dists)
+    shells: list[dict[str, Any]] = []
+    start = 0
+    ds, cs = dists[order], dots[order]
+    for k in range(1, len(ds) + 1):
+        if k == len(ds) or ds[k] - ds[start] > shell_tol:
+            shells.append({
+                "r": round(float(ds[start:k].mean()), 4),
+                "correlation": round(float(cs[start:k].mean()), 4),
+                "multiplicity": round((k - start) / n_mag, 2),
+            })
+            start = k
+    return {"n_magnetic": n_mag, "shells": shells[:30],
+            "note": "⟨Ŝ_i·Ŝ_j⟩ per shell: +1 FM, −1 AFM, 0 uncorrelated"}

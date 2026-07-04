@@ -53,6 +53,35 @@ def punch_bragg(data: np.ndarray, n_sigma: float = 6.0, radius: int = 2) -> np.n
     return out
 
 
+def fill_punched(data: np.ndarray, iterations: int = 40) -> np.ndarray:
+    """Backfill punched (NaN) voxels by iterative local averaging.
+
+    Zero-filling punched Bragg holes imprints the punch lattice on the ΔPDF
+    (sharp holes have broad transforms); filling each hole with a smooth
+    estimate of the local diffuse level suppresses that artifact — the
+    standard punch-and-fill step of 3D-ΔPDF workflows.
+    """
+    from scipy import ndimage
+
+    filled = data.copy()
+    hole = ~np.isfinite(filled)
+    if not hole.any():
+        return filled
+    filled[hole] = 0.0
+    weight = (~hole).astype(float)
+    for _ in range(iterations):
+        num = ndimage.uniform_filter(filled * weight, size=3)
+        den = ndimage.uniform_filter(weight, size=3)
+        est = np.divide(num, den, out=np.zeros_like(num), where=den > 1e-12)
+        newly = hole & (den > 1e-12)
+        filled[newly] = est[newly]
+        weight[newly] = 1.0
+        hole = hole & ~newly
+        if not hole.any():
+            break
+    return filled
+
+
 def compute_delta_pdf(data: np.ndarray, apodization: str = "hann",
                       subtract_mean: bool = True) -> np.ndarray:
     """Centred Fourier transform of an (already Bragg-punched) diffuse volume.

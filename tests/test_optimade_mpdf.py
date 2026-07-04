@@ -108,3 +108,15 @@ Mn2 0.0 0.0 -4.0
     # 8-neighbour nn shell at 3.464)
     assert abs(out["strongest_afm_distance"] - 6.633) < 0.15
     assert Path(out["saved"]).exists()
+
+
+def test_spin_correlations_shells():
+    from scattering_ai.tools.mpdf import spin_correlations
+
+    r = spin_correlations(spins=[[0, 0, 3], [0, 0, -3]], rmax=7, **CSCL)
+    shells = {round(s["r"], 2): s for s in r["shells"]}
+    assert shells[3.46]["correlation"] == -1.0      # inter-sublattice nn: AFM
+    assert shells[3.46]["multiplicity"] == 8.0
+    assert shells[4.0]["correlation"] == 1.0        # same sublattice: FM
+    assert shells[6.63]["correlation"] == -1.0
+    assert shells[6.63]["multiplicity"] == 24.0     # why it dominates the mPDF

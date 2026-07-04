@@ -187,18 +187,21 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
         return {"saved": str(out_path), "summary": s.summary()}
 
     def delta_pdf(path: str, apodization: str = "hann",
-                  punch_sigma: float = 6.0) -> dict:
+                  punch_sigma: float = 6.0, fill: bool = True) -> dict:
         from scattering_ai.tools.delta_pdf import (
             central_slices,
             compute_delta_pdf,
             delta_pdf_summary,
+            fill_punched,
             punch_bragg,
         )
         from scattering_ai.tools.models import Slice2D
 
         vol = load_volume(path)
-        dpdf = compute_delta_pdf(punch_bragg(vol.load_data(), n_sigma=punch_sigma),
-                                 apodization=apodization)
+        punched = punch_bragg(vol.load_data(), n_sigma=punch_sigma)
+        if fill:  # backfill the punch holes so their lattice doesn't imprint
+            punched = fill_punched(punched)
+        dpdf = compute_delta_pdf(punched, apodization=apodization)
         xy = central_slices(dpdf)["xy"]
         ny, nx = xy.shape
         s = Slice2D(data=xy,
@@ -481,6 +484,15 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "strongest_fm_distance": round(float(sim["r"][i_max]), 3),
                 "note": sim["note"]}
 
+    def spin_correlations_from_mcif(path: str, rmax: float = 12.0) -> dict:
+        from scattering_ai.tools.cif import read_structure
+        from scattering_ai.tools.mpdf import spin_correlations
+
+        s = read_structure(path)
+        if not s.get("moments"):
+            return {"error": f"{path} has no magnetic moments (_atom_site_moment loop)"}
+        return spin_correlations(s["lattice"], s["positions"], s["moments"], rmax=rmax)
+
     def read_rmc6f(path: str) -> dict:
         from scattering_ai.tools.rmc_files import read_rmc6f as _read
 
@@ -643,12 +655,13 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
             AgentTool(
                 "delta_pdf",
                 "Compute the 3D difference PDF (3D-ΔPDF) of a diffuse volume: "
-                "punch out Bragg peaks, apodize, and take the centred Fourier "
-                "transform. Returns a central-plane slice + plot and the "
-                "positive/negative correlation extremes. apodization: hann/"
-                "gaussian/none.",
+                "punch out Bragg peaks, backfill the holes (fill=false to skip), "
+                "apodize, and take the centred Fourier transform. Returns a "
+                "central-plane slice + plot and the positive/negative correlation "
+                "extremes. apodization: hann/gaussian/none.",
                 _params(
-                    {"path": string, "apodization": string, "punch_sigma": number},
+                    {"path": string, "apodization": string, "punch_sigma": number,
+                     "fill": {"type": "boolean"}},
                     ["path"],
                 ),
                 delta_pdf,
@@ -839,6 +852,15 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "is diffpy.mpdf territory.",
                 _params({"path": string, "rmax": number, "sigma": number}, ["path"]),
                 simulate_mpdf_from_mcif,
+            ),
+            AgentTool(
+                "spin_correlations_from_mcif",
+                "Normalized spin-pair correlations ⟨Ŝ·Ŝ⟩ per neighbour shell of a "
+                "magnetic structure (mCIF): +1 = ferromagnetic shell, −1 = "
+                "antiferromagnetic, 0 = uncorrelated — the real-space fingerprint "
+                "spinvert-style analyses report.",
+                _params({"path": string, "rmax": number}, ["path"]),
+                spin_correlations_from_mcif,
             ),
             AgentTool(
                 "read_rmc6f",

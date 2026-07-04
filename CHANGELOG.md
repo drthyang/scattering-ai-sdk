@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Structure lookup, magnetic PDF, spin correlations, punch-and-fill
+- **`lookup_structures`** (OPTIMADE): query the open crystal-structure
+  databases (default COD) by elements/formula to identify candidate phases —
+  the SDK's one network-using tool (only the query leaves the machine).
+  Live check: Ga+Nb+Se returns GaNb4Se8, F-43m, a = 10.42 Å.
+- **`simulate_mpdf_from_mcif`**: the ideal magnetic PDF of an ordered spin
+  structure (Frandsen/Billinge form) — negative peaks mark AFM-correlated
+  distances. Builds on the mCIF moment parsing.
+- **`spin_correlations_from_mcif`**: ⟨Ŝ·Ŝ⟩ per neighbour shell (+1 FM / −1
+  AFM / 0 uncorrelated) — the spinvert-style real-space fingerprint.
+- **Punch-and-fill for the 3D-ΔPDF**: punched Bragg holes are now backfilled
+  by iterative local averaging before the FFT (default on; `fill=false` to
+  skip), suppressing the punch-lattice imprint.
+- ROADMAP gains a **magnetic diffuse plan** (SpinHarmony-informed): powder
+  magnetic I(Q) (Scatty-like), spinvert-style RMC spin refinement, and
+  spinteract-style interaction refinement as staged future work, plus the
+  `skill_magnetic_diffuse` / `skill_frustration_check` skill candidates.
+
 ### PDF model fitting from a structure (community priority #1)
 - `simulate_gr_from_cif`: the model G(r) of a crystal structure — supercell
   pair sums with **neutron scattering lengths** (or x-ray Z weighting) and

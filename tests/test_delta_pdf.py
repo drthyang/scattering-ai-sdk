@@ -87,3 +87,20 @@ def test_delta_pdf_skill_on_real_volume(tmp_path):
     assert "3D-ΔPDF" in out["summary"]
     assert out["figures"] and out["figures"][0].endswith(".png")
     assert "max_positive" in out["extremes"]
+
+
+def test_fill_punched_recovers_smooth_field():
+    """Backfilling punched holes must reconstruct a smooth diffuse field far
+    better than leaving zeros (the punch lattice imprint)."""
+    from scattering_ai.tools.delta_pdf import fill_punched
+
+    n = 24
+    i = np.arange(n)
+    truth = 5 + np.cos(2 * np.pi * 3 * i / n)[:, None, None] * np.ones((n, n, n))
+    punched = truth.copy()
+    punched[4:7, 4:7, 4:7] = np.nan          # a punched Bragg hole
+    filled = fill_punched(punched)
+    assert np.isfinite(filled).all()
+    hole_err = np.abs(filled[4:7, 4:7, 4:7] - truth[4:7, 4:7, 4:7]).max()
+    zero_err = np.abs(0.0 - truth[4:7, 4:7, 4:7]).max()
+    assert hole_err < 0.35 * zero_err        # much closer than zero-filling

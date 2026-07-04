@@ -617,6 +617,36 @@ What the field's standard tools do that the SDK does not yet, impact-ordered:
 | Reciprocal-space symmetry averaging | Meerkat | Improves diffuse volumes before ΔPDF; incremental |
 | Governed end-to-end reduction→CIF | NeuDiff Agent (SNS TOPAZ) | Validates the SDK's provenance-first design; aim reports at "publication-ready" quality |
 
+### Magnetic diffuse scattering plan (SpinHarmony-informed, 2026-07)
+
+Paddison's SpinHarmony suite (Spinvert / Spinteract / Scatty) defines the
+community workflow for magnetically disordered materials. Mapping it onto the
+SDK, in build order:
+
+```text
+Tools (deterministic):
+T1. spin_correlations (built 2026-07): ⟨S_i·S_j⟩ per neighbour shell from an
+    ordered/disordered spin configuration (mCIF moments or arrays) — the
+    real-space fingerprint spinvert produces from its refined configurations.
+T2. powder magnetic diffuse I(Q) from a spin configuration (Blech–Averbach
+    powder average; Scatty's core in simplified form). Needs magnetic form
+    factors (tabulated dipole ⟨j0⟩ coefficients) for quantitative use.
+T3. Spinvert-style RMC spin refinement (fit a spin configuration to measured
+    magnetic diffuse I(Q)): a real optimizer loop — substantial; only with
+    reference data to validate against.
+T4. Spinteract-style interaction refinement (J's from diffuse data via
+    Onsager reaction-field theory): the physics prize; long-term.
+
+Agent skills (once T2 exists):
+S1. skill_magnetic_diffuse: mCIF/spin config → mPDF + spin correlations +
+    powder I(Q) in one call, with figures.
+S2. skill_frustration_check: shell correlations vs a k-vector's ideal pattern
+    (flags geometric frustration signatures).
+Diffuse (non-magnetic) additions:
+S3. punch-and-fill for delta_pdf (backfill punched voxels before FFT) and
+    Laue-symmetry averaging of slices/volumes (Meerkat-flavoured).
+```
+
 Rule still holds: every deterministic check must reproduce a known answer on
 real data in `data/` before the agent is allowed to rely on it.
 
