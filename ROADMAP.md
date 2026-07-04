@@ -567,19 +567,25 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
 - **DoD ✅:** a failing tool call in chat or over MCP surfaces in `learn signals`
   as an `error_outcome` cluster keyed by the tool, ready to seed a proposal.
 
-#### E7 — Agent-executed improvement briefs (self-implementation)
+#### E7 — Agent-executed improvement briefs (self-implementation, ✅ brief layer 2026-07)
 
 - **Goal:** for Tier-1/Tier-2 proposals the loop cannot safely auto-apply,
   generate a self-contained **brief** (evidence episodes, failing case,
-  suggested change, affected files) and hand it to a coding agent
-  (Claude Code / Codex) on an **isolated git branch** — never the working tree.
-- **Guarantees (per D15):** the brief is evidence + intent, not a patch; the
-  agent's output returns as a branch + PR for human review, gated on the full
-  suite; scientific logic, schemas, and core code still change only by
-  human-reviewed diff. This is where "the agent implements with me" lives —
-  bounded by the same tier system that governs apply.
-- **DoD:** a recurring, reproduced failure cluster produces a branch whose diff
-  a human can review and merge; the loop never merges it.
+  affected area, acceptance) and hand it to a coding agent (Claude Code / Codex)
+  on an **isolated git branch** — never the working tree.
+- **Done:** `learning/briefs.py` — `brief_from_proposal` packages a Tier-1/2
+  proposal into a `Brief` (intent, evidence, best-guess affected area, acceptance
+  incl. "suite passes + regression test", non-negotiable constraints); Tier-0 is
+  rejected (it applies directly). `render_brief` emits agent-ready markdown;
+  `learn brief --id <id> [--write]`.
+- **Guarantees (per D15):** the brief is **evidence + intent, not a patch**; it
+  carries no diff and cannot authorise a merge; the agent's output returns as a
+  branch + PR for human review; scientific logic, schemas, and core code still
+  change only by human-reviewed diff.
+- **Remaining:** optional one-command hand-off that launches the coding agent on
+  the branch (today the human copies the brief into Codex/Claude Code).
+- **DoD:** a recurring, reproduced failure cluster produces a brief a human runs
+  to get a reviewable branch; the loop never merges it.
 
 #### E8 — Data-gated capability queue
 

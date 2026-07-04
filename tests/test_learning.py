@@ -526,3 +526,60 @@ def test_cli_apply_dry_run_then_approve(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["outcome"] == "applied" and out["proposal_id"] == pid
     assert (repo / "tests" / "regressions" / f"{pid}.json").exists()
+
+
+# --- Phase E7: agent-executed improvement briefs ------------------------------
+
+from scattering_ai.learning.briefs import (  # noqa: E402
+    Brief,
+    brief_from_proposal,
+    render_brief,
+)
+
+
+def test_brief_from_tier1_proposal_carries_evidence_and_constraints():
+    corr = make_correction("e9", target="domain", statement="should be pdf not data",
+                           domain="data")
+    p = _bp(_FakeJournal([], [corr]))[0]  # Tier-1 router_rule
+    brief = brief_from_proposal(p)
+    assert brief.tier == 1 and brief.branch == f"fix/{p.id}"
+    assert brief.evidence_episodes == ["e9"]
+    assert "router.py" in brief.affected_area
+    assert any("isolated branch" in c for c in brief.constraints)
+    assert any("pytest" in a for a in brief.acceptance)
+
+
+def test_brief_from_tier2_task_points_at_diagnostic():
+    eps = [_episode(id=f"e{i}", outcome="error",
+                    findings=[FindingTag(diagnostic="peak_fit", severity="error")])
+           for i in range(3)]
+    p = _bp(_FakeJournal(eps))[0]  # Tier-2 task, error_outcome
+    brief = brief_from_proposal(p)
+    assert brief.tier == 2 and "peak_fit" in brief.affected_area
+    md = render_brief(brief)
+    assert "Improvement brief" in md and "Constraints" in md and "not a patch" in md
+
+
+def test_brief_rejects_tier0():
+    corr = make_correction("e1", target="d_spacing", statement="wrong",
+                           corrected_value="2.5", domain="pdf")
+    p = _bp(_FakeJournal([], [corr]))[0]  # Tier-0 regression_eval
+    with pytest.raises(ValueError):
+        brief_from_proposal(p)
+
+
+def test_cli_learn_brief(tmp_path, capsys):
+    from scattering_ai.cli import main
+
+    jdir = tmp_path / "j"
+    ag = Agent(journal=jdir)
+    ag.analyze(AnalysisRequest(question="?", data={"files": _series(tmp_path)}))
+    ep = Journal(jdir).episodes()[0]
+    ag.record_correction(ep, target="domain", statement="should be pdf", domain="data")
+    pid = _bp(Journal(jdir))[0].id
+
+    rc = main(["learn", "brief", "--journal", str(jdir), "--id", pid, "--write"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Improvement brief" in out and "Constraints" in out
+    assert (jdir / "briefs" / f"{pid}.md").exists()

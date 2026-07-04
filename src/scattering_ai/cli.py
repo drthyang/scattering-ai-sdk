@@ -264,6 +264,16 @@ def main(argv: list[str] | None = None) -> int:
     learn_apply.add_argument("--repo", default="",
                              help="Repo root for Tier-0 writes (default: enclosing git root)")
 
+    learn_brief = learn_sub.add_parser(
+        "brief", help="Package a Tier-1/Tier-2 proposal into an agent-ready "
+        "improvement brief (evidence + intent, never a patch)")
+    learn_brief.add_argument("--journal", default="", help=_journal_help)
+    learn_brief.add_argument("--id", required=True, help="Proposal id (see 'learn review')")
+    learn_brief.add_argument("--min-occurrences", type=int, default=3,
+                             help="Must match the 'learn review' threshold that produced the id")
+    learn_brief.add_argument("--write", action="store_true",
+                             help="Also write the brief into <journal>/briefs/")
+
     args = parser.parse_args(argv)
     if args.command == "learn":
         from scattering_ai.learning.journal import Journal, resolve_journal_dir
@@ -322,6 +332,26 @@ def main(argv: list[str] | None = None) -> int:
             record = apply_proposal(match, journal=journal,
                                     repo_root=args.repo or None, approve=True)
             print(json.dumps(record.model_dump(), indent=2))
+        elif args.learn_command == "brief":
+            from scattering_ai.learning.briefs import brief_from_proposal, render_brief
+            from scattering_ai.learning.proposals import build_proposals
+
+            proposals = build_proposals(journal, min_occurrences=args.min_occurrences)
+            match = next((p for p in proposals if p.id == args.id), None)
+            if match is None:
+                sys.exit(f"error: no proposal with id {args.id!r}; run 'learn review' "
+                         f"(available: {', '.join(p.id for p in proposals) or 'none'})")
+            if match.tier == 0:
+                sys.exit(f"error: {match.id!r} is Tier-0 — apply it directly with "
+                         "'learn apply' (eval-gated); briefs are for Tier-1/Tier-2")
+            brief = brief_from_proposal(match)
+            markdown = render_brief(brief)
+            print(markdown)
+            if args.write:
+                out = directory / "briefs" / f"{brief.proposal_id}.md"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(markdown, encoding="utf-8")
+                print(f"(wrote {out})")
         return 0
     if args.command == "mcp":
         from scattering_ai.server.mcp import serve
