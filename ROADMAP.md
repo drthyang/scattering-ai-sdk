@@ -564,16 +564,25 @@ LLM-loop hardening (reasoning-block/prose-tolerant JSON + retry); **summarizing
 figures** in reports with first-class **phase-transition** detection (`data`
 pack) and **maximal-subgroup trees** (`symmetry` pack).
 
+Ported from sibling repos (2026-07): 3D-ΔPDF (independent MIT implementation of
+the standard windowed-FFT method; nebula3d is AGPL so its source was not copied),
+RMCProfile readers + KDE density map (adapted from the MIT rmc-toolkits). Symmetry
+gained systematic absences + cell standardization.
+
 ```text
 Next:
 1.  B4 — `ins` pack (inelastic neutron scattering, incl. phonons per D12):
     diagnostics on S(Q,ω) / dispersion / DOS data once such data lands in data/
-    (acceptance = known answer). Deferred until example data exists.
-2.  D5 groundwork — assemble reproducible case-study runs the packs now enable
+    (acceptance = known answer). Deferred until example data exists — this is
+    also the home for rmc-phonon's reciprocal-space / k-path utilities.
+2.  Symmetry, when representation-theory tables are available: klassengleiche
+    subgroups, irrep / symmetry-mode decomposition, k-vector → maximal magnetic
+    space groups (MAXMAGN).
+3.  D5 groundwork — assemble reproducible case-study runs the packs now enable
     (phase transition, inverted-.gr, diffuse contaminant/anisotropy, RMC
     convergence) for the publication evidence base.
-3.  Chat polish: surface figures inline; optional streaming.
-4.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
+4.  Chat polish: surface figures inline; optional streaming.
+5.  A3 (much later): cross-domain coordinator once ≥3 packs are in real use.
 ```
 
 Rule still holds: every deterministic check must reproduce a known answer on

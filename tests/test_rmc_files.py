@@ -62,3 +62,42 @@ def test_registry_rmc_tools(tmp_path):
     reg = default_toolkit(tmp_path / "ws")
     out = reg.execute("read_rmc6f", {"path": str(p)})
     assert out["composition"] == {"Cl": 2, "Na": 2} and "positions" not in out  # trimmed
+
+
+def _big_rmc6f(n=200):
+    rng = np.random.default_rng(0)
+    lines = ["(Version 6f)", "Supercell dimensions: 2 2 2", "Lattice vectors (Ang):",
+             " 8 0 0", " 0 8 0", " 0 0 8", "Atoms:"]
+    for i in range(n):
+        x, y, z = rng.random(3)
+        lines.append(f"{i + 1} Na Na {x:.4f} {y:.4f} {z:.4f} 1 0 0 0")
+    return "\n".join(lines) + "\n"
+
+
+def test_rmc_density_slab(tmp_path):
+    import pytest
+
+    pytest.importorskip("scipy")
+    from scattering_ai.tools.rmc_files import rmc_density_slab
+
+    p = tmp_path / "big.rmc6f"
+    p.write_text(_big_rmc6f())
+    r = rmc_density_slab(str(p), axis=2, thickness=0.3)
+    assert r["density"].shape == (100, 100)
+    assert r["n_points"] > 5
+    # too-thin slab returns a graceful error, not a crash
+    thin = rmc_density_slab(str(p), axis=2, thickness=0.001)
+    assert "error" in thin
+
+
+def test_rmc_density_map_tool(tmp_path):
+    import pytest
+
+    pytest.importorskip("matplotlib")
+    from scattering_ai.tools.registry import default_toolkit
+
+    p = tmp_path / "big.rmc6f"
+    p.write_text(_big_rmc6f())
+    reg = default_toolkit(tmp_path / "ws")
+    m = reg.execute("rmc_density_map", {"path": str(p), "axis": 2})
+    assert m["n_points"] > 5 and m["plot"].endswith(".png")

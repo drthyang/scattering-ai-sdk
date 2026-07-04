@@ -428,6 +428,28 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
 
         return read_rmc_csv(path)
 
+    def rmc_density_map(path: str, axis: int = 2, element: str = "",
+                        thickness: float = 0.25) -> dict:
+        from scattering_ai.tools.models import Slice2D
+        from scattering_ai.tools.rmc_files import rmc_density_slab
+
+        r = rmc_density_slab(path, axis=axis, element=element or None, thickness=thickness)
+        if "error" in r:
+            return r
+        s = Slice2D(data=r["density"], x_centers=r["x_centers"], y_centers=r["y_centers"],
+                    xlabel=r["xlabel"], ylabel=r["ylabel"], meta={"kind": "rmc_density"})
+        out = artifact("rmc_density", ".npz")
+        _save_slice(s, out)
+        result = {"saved": str(out), "n_points": r["n_points"],
+                  "element": r["element"], "slab": r["slab"]}
+        try:
+            from scattering_ai.tools.plotting import plot_slice
+
+            result["plot"] = plot_slice(s, artifact("rmc_density", ".png"), log=False)
+        except ImportError:
+            pass
+        return result
+
     def systematic_absences(path: str, max_index: int = 6) -> dict:
         from scattering_ai.tools import symmetry as sym
 
@@ -714,6 +736,18 @@ def default_toolkit(workspace: str | Path, skills: bool = True) -> ToolRegistry:
                 "columns for convergence analysis.",
                 _params({"path": string}, ["path"]),
                 read_rmc_series,
+            ),
+            AgentTool(
+                "rmc_density_map",
+                "Kernel-density map of an RMCProfile .rmc6f configuration folded "
+                "into the average unit cell (a slab ⟂ axis 0/1/2, optionally one "
+                "element) — reveals split sites and local disorder. Saves a plot.",
+                _params(
+                    {"path": string, "axis": {"type": "integer"},
+                     "element": string, "thickness": number},
+                    ["path"],
+                ),
+                rmc_density_map,
             ),
             AgentTool(
                 "systematic_absences",

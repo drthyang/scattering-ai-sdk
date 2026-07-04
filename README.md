@@ -24,7 +24,7 @@ fully offline with local models.
 |-------------|--------------------------------------------------------|--------|
 | A **T/field scan** of patterns | Whether there's a **phase transition**, its T_c, and which peaks move | waterfall + peak tracking |
 | A **G(r) / S(Q)** curve | Non-standard/inverted G(r), low-r artifacts, first-neighbour distance, S(Q) vs S(Q)−1 | overview plot |
-| A **diffuse volume / slice** | Bragg-vs-diffuse character, contaminant powder rings, Bragg-punch coverage, sampling anisotropy | log-scale map |
+| A **diffuse volume / slice** | Bragg-vs-diffuse character, contaminant rings, Bragg-punch coverage, sampling anisotropy; **3D-ΔPDF** (punch → apodize → FFT) | log-scale map / ΔPDF slice |
 | A **crystal structure (CIF/mCIF)** | Space group + Wyckoff sites, **maximal subgroups** (phase-transition pathways), pseudosymmetric parent, magnetic space group | structure view + subgroup tree |
 | **RMC monitor state** | Convergence trend, Bragg/PDF & neutron/x-ray conflicts, missing files | — |
 
@@ -81,7 +81,7 @@ Auto-detected from the input, or set explicitly (`--domain` / `domain=`):
 - **`pdf`** — total scattering: G(r), S(Q), F(Q).
 - **`diffuse`** — single-crystal diffuse scattering / 3D-ΔPDF (volumes and slices).
 - **`symmetry`** — crystallographic symmetry from a CIF: space group, Wyckoff sites, maximal subgroups, pseudosymmetry, magnetic groups ([`symmetry`] extra, spglib).
-- **`rmc`** — RMCProfile run health.
+- **`rmc`** — RMCProfile run health; reads `.rmc6f` configurations (cell, supercell, composition) and R-value logs.
 
 Each pack is self-contained (diagnostics + knowledge + prompt + next-check rules
 + figures). Third parties add packs via the `scattering_ai.domains` entry point
@@ -124,6 +124,13 @@ input → auto-route to a domain pack → deterministic diagnostics (+ figures)
 ```bash
 pip install -e ".[dev]" && pytest && ruff check .
 ```
+
+## Acknowledgements
+
+The RMCProfile file readers and the KDE density map are adapted from the
+MIT-licensed [rmc-toolkits](https://github.com/drthyang/rmc-toolkits). The
+3D-ΔPDF is an independent implementation of the standard windowed-FFT method
+(as in [nebula3d](https://github.com/drthyang/nebula3d)).
 
 ## License
 

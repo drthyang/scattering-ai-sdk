@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### New technique tools (symmetry + ported from sibling repos)
+- **Symmetry:** `systematic_absences` (symmetry-allowed reflections / extinction
+  conditions — a symmetry-filtered Bragg checklist) and `standardize_cell`
+  (conventional/primitive setting + transformation matrix). Remaining assessed
+  items (klassengleiche subgroups, irrep/symmetry-mode decomposition, k-vector →
+  maximal magnetic groups) need external representation-theory tables and are
+  documented as future work.
+- **3D-ΔPDF** (`delta_pdf` tool, `tools/delta_pdf.py`): the difference-PDF of a
+  diffuse volume via the standard punch → apodize → centred-FFT recipe — an
+  independent MIT implementation (nebula3d is AGPL, so its source was not
+  copied). `Volume3D.load_data()` reads the full array. Validated on the real
+  CORELLI volume.
+- **RMCProfile files** (`tools/rmc_files.py`, adapted from the MIT rmc-toolkits):
+  `read_rmc6f` (average unit cell, supercell, composition, folded positions),
+  `read_rmc_csv` (R-value/χ² logs), and `rmc_density_map` (KDE slab of a config,
+  revealing split sites / disorder). `.rmc6f` files auto-route to the `rmc`
+  domain, which reports the configuration.
+
 ### Structure visualization + organized skills
 - **CIF/mCIF visualization** (`plot_structure` tool, `skill_visualize_structure`):
   a matplotlib 3D render of the unit cell — element-coloured atoms, bonds, and
