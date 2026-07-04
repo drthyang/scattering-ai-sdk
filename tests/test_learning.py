@@ -256,9 +256,11 @@ def test_correction_becomes_tier0_regression_eval_carrying_value():
                            statement="transitions are 50 K and 29 K, not 39 K",
                            corrected_value="50,29", domain="series")
     props = build_proposals(_FakeJournal([], [corr]))
-    assert len(props) == 1  # a single correction always proposes
-    p = props[0]
-    assert p.tier == 0 and p.change_class == "regression_eval"
+    # a non-routing correction yields a regression eval AND a knowledge snippet (E9)
+    classes = {p.change_class for p in props}
+    assert classes == {"regression_eval", "knowledge_snippet"}
+    p = next(p for p in props if p.change_class == "regression_eval")
+    assert p.tier == 0
     assert p.corrected_value == "50,29" and "50,29" in p.suggested_action
     assert p.evidence_episodes == ["e1"]
 
@@ -583,3 +585,37 @@ def test_cli_learn_brief(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "Improvement brief" in out and "Constraints" in out
     assert (jdir / "briefs" / f"{pid}.md").exists()
+
+
+# --- Phase E9: knowledge growth -----------------------------------------------
+
+def test_correction_yields_knowledge_snippet_proposal():
+    corr = make_correction("e1", target="low_r_artifact",
+                           statement="below 1.5 A the ripple is termination, not signal",
+                           domain="pdf")
+    props = build_proposals(_FakeJournal([], [corr]))
+    ks = [p for p in props if p.change_class == "knowledge_snippet"]
+    assert len(ks) == 1 and ks[0].tier == 0 and ks[0].domain == "pdf"
+    assert ks[0].evidence_episodes == ["e1"]
+
+
+def test_routing_correction_has_no_knowledge_snippet():
+    corr = make_correction("e2", target="domain", statement="should be pdf",
+                           domain="data")
+    classes = {p.change_class for p in build_proposals(_FakeJournal([], [corr]))}
+    assert "knowledge_snippet" not in classes  # a mis-route isn't domain knowledge
+
+
+def test_apply_knowledge_snippet_writes_cited_note(tmp_path):
+    corr = make_correction("e1", target="low_r_artifact",
+                           statement="below 1.5 A the ripple is termination",
+                           corrected_value="1.5", domain="pdf")
+    p = next(x for x in build_proposals(_FakeJournal([], [corr]))
+             if x.change_class == "knowledge_snippet")
+    j = _journal(tmp_path)
+    rec = apply_proposal(p, journal=j, repo_root=tmp_path, approve=True, gate=_GREEN)
+    assert rec.outcome == "applied"
+    note = tmp_path / "knowledge" / "learned" / "pdf__low_r_artifact.md"
+    assert note.exists()
+    text = note.read_text()
+    assert "termination" in text and "e1" in text and "1.5" in text  # cited + value

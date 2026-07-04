@@ -162,6 +162,27 @@ def _writes_next_check_rule(p: Proposal) -> list[FileWrite]:
     return [FileWrite(path=f"knowledge/next_checks/{slug}.md", content=md)]
 
 
+def _writes_knowledge_snippet(p: Proposal) -> list[FileWrite]:
+    slug = f"{p.domain or 'general'}__{p.key or 'note'}"
+    body = [
+        f"# Learned: {p.key} ({p.domain or 'general'})",
+        "",
+        p.rationale,
+        "",
+    ]
+    if p.corrected_value:
+        body += [f"Corrected value: `{p.corrected_value}`", ""]
+    body += [
+        f"Source: human correction · proposal `{p.id}` · episodes "
+        f"{', '.join(p.evidence_episodes) or '—'}",
+        "",
+        "> Captured by the self-improvement loop (E9) from a human correction. "
+        "Cited, reviewable knowledge — the RAG layer learns real gotchas.",
+        "",
+    ]
+    return [FileWrite(path=f"knowledge/learned/{slug}.md", content="\n".join(body))]
+
+
 def _writes_draft(p: Proposal) -> list[FileWrite]:
     md = (
         f"# DRAFT (not activated): {p.title}\n\n"
@@ -193,6 +214,7 @@ def _writes_task(p: Proposal) -> list[FileWrite]:
 _WRITERS: dict[str, Callable[[Proposal], list[FileWrite]]] = {
     "regression_eval": _writes_regression_eval,
     "next_check_rule": _writes_next_check_rule,
+    "knowledge_snippet": _writes_knowledge_snippet,
     "prompt_version_bump": _writes_draft,
     "router_rule": _writes_draft,
     "task": _writes_task,

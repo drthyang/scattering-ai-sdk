@@ -195,6 +195,30 @@ def _correction_proposal(cluster: SignalCluster, corrections: list[Correction]) 
     )
 
 
+def _knowledge_proposal(cluster: SignalCluster, corrections: list[Correction]) -> Proposal:
+    """E9: capture a non-routing correction as a cited knowledge snippet (Tier-0)."""
+    dom = cluster.domain or "general"
+    statements = "; ".join(c.statement for c in corrections) or cluster.key
+    values = [c.corrected_value for c in corrections if c.corrected_value]
+    return Proposal(
+        id=_slug("p", "0", "knowledge", cluster.domain, cluster.key),
+        tier=0,
+        change_class="knowledge_snippet",
+        signal_type="correction",
+        domain=cluster.domain,
+        key=cluster.key,
+        title=f"Capture corrected knowledge on '{cluster.key}' ({dom})",
+        rationale=f"Human correction ({len(corrections)}): {statements}",
+        suggested_action=(
+            f"Add a cited knowledge snippet on '{cluster.key}' to the '{dom}' "
+            "knowledge base so future related questions retrieve it (Tier-0 data; "
+            "landed only if the suite stays green)."),
+        corrected_value=values[0] if values else "",
+        evidence_episodes=[c.episode_id for c in corrections if c.episode_id],
+        evidence_count=len(corrections),
+    )
+
+
 def build_proposals(journal, min_occurrences: int = DEFAULT_MIN_OCCURRENCES,
                     polish: Callable | None = None) -> list[Proposal]:
     """Generate reviewable proposals from a journal's signals + corrections.
@@ -218,6 +242,10 @@ def build_proposals(journal, min_occurrences: int = DEFAULT_MIN_OCCURRENCES,
         if cluster.type == "correction":
             corrs = corr_by_key.get((cluster.domain, cluster.key), [])
             proposals.append(_correction_proposal(cluster, corrs))
+            # E9: a non-routing correction is also curated knowledge — offer to
+            # capture it as a cited snippet so future related questions retrieve it.
+            if cluster.key != "domain":
+                proposals.append(_knowledge_proposal(cluster, corrs))
         elif cluster.type in _SPECS and cluster.count >= min_occurrences:
             proposals.append(_templated_proposal(cluster))
 

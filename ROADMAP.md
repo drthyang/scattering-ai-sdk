@@ -596,13 +596,21 @@ eval-gated diff. Design + safety invariants: `docs/self_improvement.md`.
 - **DoD:** dropping S(Q,ω) data into `data/` raises a "ready to build `ins`"
   proposal with a scaffolded pack stub and a pinned known-answer eval to fill.
 
-#### E9 — Knowledge growth
+#### E9 — Knowledge growth (✅ 2026-07)
 
 - **Goal:** corrections and resolved failures feed the curated knowledge base
   (Tier-0 snippet proposals), so retrieved knowledge improves with use — the
   RAG layer learns the researcher's real gotchas, cited and reviewed.
-- **DoD:** an accepted correction can land (human-approved) as a cited knowledge
-  snippet that a later related question retrieves.
+- **Done:** a non-routing correction now yields a `knowledge_snippet` proposal
+  (Tier-0) alongside its regression eval; `learn apply` writes a cited
+  `knowledge/learned/<domain>__<key>.md` (statement + corrected value + source
+  episodes) through the eval gate. Routing corrections don't (a mis-route isn't
+  domain knowledge).
+- **Remaining:** re-index `knowledge/learned/` into the retriever so applied
+  snippets are actually retrieved (currently written + cited; retrieval wiring
+  is the follow-up).
+- **DoD:** an accepted correction lands (human-approved) as a cited knowledge
+  snippet; retrieval of it is the remaining wiring.
 
 ---
 
